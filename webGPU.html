@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בדיקת WebGPU</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #1a1a1a; 
+            color: white; 
+            font-family: sans-serif; 
+        }
+        #info { 
+            position: absolute; 
+            top: 20px; 
+            width: 100%; 
+            text-align: center; 
+            font-size: 1.2rem;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">בודק תמיכה ב-WebGPU...</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import WebGPU from 'three/addons/capabilities/WebGPU.js';
+        import WebGPURenderer from 'three/addons/renderers/webgpu/WebGPURenderer.js';
+
+        const infoElement = document.getElementById('info');
+
+        // 1. בדיקת תמיכה ב-WebGPU
+        if ( WebGPU.isAvailable() === false ) {
+            infoElement.innerHTML = 'הדפדפן שלך לא תומך ב-WebGPU או שהוא כבוי.';
+            infoElement.style.color = 'red';
+            document.body.appendChild( WebGPU.getErrorMessage() );
+        } else {
+            infoElement.innerHTML = 'WebGPU נתמך ועובד! מציג קוביה...';
+            infoElement.style.color = 'lightgreen';
+            initWebGPU();
+        }
+
+        function initWebGPU() {
+            // 2. יצירת סצנה ומצלמה
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 100 );
+            camera.position.z = 2.5;
+
+            // 3. יצירת הקוביה
+            const geometry = new THREE.BoxGeometry();
+            const material = new THREE.MeshNormalMaterial(); // חומר צבעוני שלא דורש תאורה
+            const cube = new THREE.Mesh( geometry, material );
+            scene.add( cube );
+
+            // 4. הגדרת WebGPURenderer
+            const renderer = new WebGPURenderer( { antialias: true } );
+            renderer.setPixelRatio( window.devicePixelRatio );
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            document.body.appendChild( renderer.domElement );
+
+            // 5. לולאת האנימציה
+            function animate() {
+                requestAnimationFrame( animate );
+
+                // סיבוב הקוביה
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.02;
+
+                // רינדור הסצנה ב-WebGPU
+                renderer.render( scene, camera );
+            }
+
+            animate();
+
+            // 6. התאמה לשינוי גודל החלון
+            window.addEventListener( 'resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize( window.innerWidth, window.innerHeight );
+            });
+        }
+    </script>
+</body>
+</html>

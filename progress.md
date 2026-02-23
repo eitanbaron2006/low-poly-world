@@ -1,0 +1,166 @@
+Original prompt: יש לי אפליקציה של webgpu שעובדת בקובץ webgpu.html ויש לי קוד שבנוי בצורה אחרת בקובץ lowpoly-world.html. אני רוצה שתקח את הקוד של עולם הפולי שלי ותמיר אותו לקוד עם webgpu תוך דריסה של lowpoly-world-webgpu.html.
+
+- 2026-02-23: Started conversion workflow using develop-web-game skill.
+- 2026-02-23: Overwrote `lowpoly-world-webgpu.html` with a WebGPU port of `lowpoly-world.html`.
+  - Switched from legacy `<script src=three.min.js>` to ESM import map + module imports.
+  - Replaced `THREE.WebGLRenderer` with `WebGPURenderer` and added WebGPU availability/init checks.
+  - Updated main loop to `await renderer.renderAsync(scene, camera)`.
+  - Added `window.render_game_to_text` and `window.advanceTime(ms)` hooks for automated inspection.
+  - Replaced custom GLSL water/foam ShaderMaterial with WebGPU-safe built-in materials to reduce compatibility issues.
+- 2026-02-23: Ran Playwright client against `http://127.0.0.1:5173/lowpoly-world-webgpu.html`.
+  - Artifacts: `output/web-game/shot-0.png`, `output/web-game/errors-0.json`.
+  - Result in this environment: WebGPU unavailable (expected in headless/unsupported GPU contexts).
+  - TODO: Verify full in-game rendering/movement on a local machine/browser with WebGPU enabled.
+- 2026-02-23: Fixed WebGPU render compatibility for environments where `WebGPURenderer` exposes `render(...)` but not `renderAsync(...)`.
+  - Added `renderFrame()` helper in `lowpoly-world-webgpu.html`:
+    - Uses `await renderer.renderAsync(scene, camera)` when available.
+    - Falls back to `renderer.render(scene, camera)` otherwise.
+  - Replaced direct `renderer.renderAsync(...)` calls in `animate()` and `window.advanceTime(...)` with `renderFrame()`.
+  - Made `boot()` resilient by calling `await renderer.init()` only if `renderer.init` exists.
+  - Added `renderFailureShown` guard to avoid repeating the same render error every frame.
+- 2026-02-23: Re-ran Playwright client after fix.
+  - Artifacts: `output/web-game/shot-0.png`, `output/web-game/errors-0.json` (updated timestamp).
+  - Console/page result in this environment remains only `Error: WebGPU is not available` (environment limitation); no runtime `renderAsync is not a function` issue can be reproduced here due to unavailable WebGPU backend.
+- 2026-02-23: Added `<link rel="icon" href="data:,">` in `lowpoly-world-webgpu.html` to suppress `favicon.ico` 404 in local dev servers.
+- 2026-02-23: Performance tuning pass after user reported heavy/stuttery WebGPU runtime.
+  - Added a quality preset (`?quality=high` for visual mode, default is performance).
+  - Lowered default workload:
+    - `RENDER_CHUNKS`: 5 -> 4 in performance mode.
+    - Pixel ratio cap: `1.0` in performance mode (`1.5` in high mode).
+    - Shadows disabled in performance mode (kept for high mode).
+    - Reduced decoration count per chunk in performance mode.
+  - Reworked render loop to avoid async frame stalls:
+    - Removed `await` from the main `requestAnimationFrame` loop.
+    - Added `renderInFlight` guard so `renderAsync` calls do not overlap.
+    - Centralized one-time render error reporting.
+  - Updated `window.advanceTime` to use non-await render path.
+- 2026-02-23: Re-ran Playwright client after performance changes.
+  - Artifacts updated: `output/web-game/shot-0.png`, `output/web-game/errors-0.json`.
+  - In this CI/headless environment, result remains `Error: WebGPU is not available` (environment limitation).
+- 2026-02-23: User requested water to match Three.js `webgpu_backdrop_water` example and restore old look/contrast.
+  - Switched WebGPU build imports to modern TSL-capable Three.js (`three/webgpu` + `three/tsl`, v0.183.1 via jsDelivr).
+  - Replaced lowpoly/foam lake material with backdrop water node material adapted from the official example:
+    - Worley-noise animated surface
+    - Depth-aware refraction using `viewportDepthTexture`
+    - Backdrop blending via `backdropNode`/`backdropAlphaNode`
+  - Kept existing gameplay/performance structure (render-loop optimizations, quality preset).
+  - Added visual matching preset for legacy look:
+    - New URL param `look` (`legacy` default, `flat` optional).
+    - Tuned ambient/hemi/sun intensities + tone-mapping exposure for closer contrast to old WebGL look.
+  - Removed previous foam ring and per-frame water uniform updates (no longer needed with node-based water).
+  - Fixed a naming collision (`time` from TSL vs local timer) by renaming local timer to `elapsedTime`.
+- 2026-02-23: Re-ran Playwright client after water/look update.
+  - Artifacts updated: `output/web-game/shot-0.png`, `output/web-game/errors-0.json`.
+  - Result in this environment remains only `Error: WebGPU is not available` (headless limitation); no syntax/import errors remained after fixes.
+- 2026-02-23: Cleanup
+  - Removed temporary fetch files used during example inspection.
+  - Removed unused `waterMeshes` tracking after moving to node-based backdrop water material.
+- 2026-02-23: Visual fix pass after user screenshot feedback.
+  - Water pools looked “empty” / too transparent:
+    - Increased base water fill contribution and opacity.
+    - Reduced extreme transparency by clamping backdrop alpha.
+    - Increased lake circle tessellation and raised water level (`baseH - 0.18`) so pools look filled.
+  - Projectiles looked almost black:
+    - Changed projectile material to brighter blue base with emissive term.
+    - Set `toneMapped: false` for projectile material to prevent over-darkening under current post/lighting.
+  - Global look brightening:
+    - Raised ambient/hemi/sun intensities and exposure for `legacy` look preset.
+  - Build tag bumped to `webgpu-backdrop-water-v5`.
+- 2026-02-23: Corrective pass per user feedback ("no color hack", "water only in blue areas").
+  - Reverted projectile material back to original (`0x1a1a2e`, no emissive/toneMapped override).
+  - Added lighting-only readability fix: extra subtle sky hemisphere fill.
+  - Reworked lake spawning logic:
+    - Removed old chunk-random lake placement.
+    - Added deterministic lake registry (`Map`) keyed by the same lake-cell formula used in `isLake`.
+    - Lakes are now created only for descriptors where `seed < 0.18` and only when intersecting currently built chunks.
+  - Updated telemetry output from `lakes.length` to `lakes.size`.
+  - Restored backdrop-water node math closer to official `webgpu_backdrop_water` parameters (depth/refraction thresholds, color mixing).
+  - Build tag bumped to `webgpu-backdrop-water-v6`.
+- 2026-02-23: Water visibility scale-fix pass (v7).
+  - Root cause identified: official example depth thresholds were too small for this world scale, causing near-zero visible water.
+  - Tuned backdrop-water depth parameters to world scale:
+    - `depthEffect`: `remapClamp(-0.05, 2.0)`
+    - `depthRefraction`: `remapClamp(0, 3.0)`
+  - Slightly raised water surface level to `baseH - 0.25` for better read in lake depressions.
+  - Light-only visibility adjustments (no projectile material hacks):
+    - Increased ambient/hemi/sun/exposure in legacy look.
+    - Increased sky fill intensity.
+  - Build tag bumped to `webgpu-backdrop-water-v7`.
+- 2026-02-23: Lake representation overhaul (v8) based on user screenshot ("thin plate only").
+  - Replaced per-lake single circle mesh with per-chunk lake meshes derived directly from the terrain chunk and `isLake` mask:
+    - Water now appears wherever chunk triangles evaluate as lake area (triangle-center test), improving coverage continuity.
+  - Added two-layer water rendering for stronger volume feel:
+    - Surface layer: backdrop water node material (`MeshBasicNodeMaterial`) with stronger opacity/alpha.
+    - Depth layer: tinted transparent mesh below surface (`lakeDepthMaterial`) to add body/absorption.
+  - Updated chunk lifecycle:
+    - Build lake meshes during `buildChunk(...)`.
+    - Dispose/remove lake surface+depth meshes during `removeChunk(...)`.
+  - Build tag bumped to `webgpu-backdrop-water-v8`.
+- 2026-02-23: Flat-surface lake physics/visual correction (v9) after user reported water following terrain.
+  - Reworked chunk lake mesh generator to use deterministic per-lake descriptors:
+    - `getLakeDescriptor(lx,lz)` caches center/radius and a single `waterLevel`.
+    - `getLakeAt(wx,wz)` maps world points to the owning lake descriptor.
+  - Built lake water per-quad (not per-triangle center test) using a single flat `topY = waterLevel`:
+    - Top layer is now always flat horizontally.
+    - Depth layer still follows local terrain (`depthY`) to preserve basin shape.
+  - Added low-basin filter (`avgH > waterLevel + 0.06`) so water fills low enclosed zones and avoids climbing up high terrain.
+  - Build tag bumped to `webgpu-backdrop-water-v9`.
+- 2026-02-23: Water artifact smoothing pass (v10) after user highlighted non-physical polygon blocks.
+  - Main change: switched lake fill from per-quad inclusion to per-triangle inclusion.
+    - Each triangle is now tested independently against lake membership at its centroid.
+    - Reduces chunky rectangular patches and improves shoreline continuity.
+  - Reduced depth-layer visual harshness:
+    - `lakeDepthMaterial.opacity` lowered to `0.14`.
+    - `lakeDepthMaterial.side` changed to `THREE.FrontSide` to reduce backface artifacts.
+  - Build tag bumped to `webgpu-backdrop-water-v10`.
+- 2026-02-23: Volumetric water body rewrite (v11) per user request for physically plausible liquid behavior.
+  - Replaced unstable mixed water approaches with a single volumetric algorithm per chunk:
+    - Flat top water surface (backdrop-water material) at one deterministic water level per lake.
+    - Volume side walls generated only on true water boundaries (no internal overlapping walls).
+    - Higher-resolution water sampling grid (`WATER_SURFACE_SUBDIV`) to reduce blocky shoreline artifacts.
+  - Added deterministic lake-level computation from basin sampling:
+    - Samples lake floor and rim heights.
+    - Sets level from lowest spill boundary and target fill depth, instead of arbitrary constant offsets.
+  - Added smooth basin depth profile (center deeper, edge shallow) for terrain/lake bottom continuity.
+  - Unified terrain sampling to use `getLakeBottomHeight(...)` so ground, physics sampling, and water volume share the same basin model.
+  - Fixed stale/inconsistent cleanup paths:
+    - `removeChunk(...)` now disposes new `{ surface, volume }` water meshes safely.
+    - Removed old skirt/depth assumptions that no longer matched runtime structures.
+  - Build tag bumped to `webgpu-volumetric-water-v11`.
+- 2026-02-23: Coverage + closed-volume reinforcement (v12).
+  - Increased water mesh resolution (`WATER_SURFACE_SUBDIV`) to reduce shoreline gaps.
+  - Reworked lake profile to include explicit `bottom` height per lake (`computeLakeProfile`), not only surface level.
+  - Changed water-cell selection from center-only to corner+center membership so lake coverage no longer misses border areas.
+  - Added explicit bottom faces for water cells, so each water area is a closed body (top + sides + bottom), not side walls only.
+  - Volume walls now use lake-level-to-lake-bottom thickness, giving a true visible body depth.
+  - Build tag bumped to `webgpu-volumetric-water-v12`.
+- 2026-02-23: Optical opacity pass to hide lake floor from top/grazing angles (v13).
+  - Strengthened water extinction in backdrop shader (`depthEffect`/`depthRefraction` ranges tuned for less see-through).
+  - Increased water optical alpha (`backdropAlphaNode`, material opacity) and deepened water tint.
+  - Increased volumetric body opacity and darkened bulk color for stronger depth absorption.
+  - Build tag bumped to `webgpu-volumetric-water-v13`.
+- 2026-02-23: Underwater object readability + realistic distortion balance (v14).
+  - Replaced near-uniform opacity with depth-dependent attenuation:
+    - Shallow submerged bodies remain visible and refracted.
+    - Deep lake bottoms fade out more aggressively.
+  - Increased refraction warp amplitude slightly and tuned refraction depth range.
+  - Kept closed volumetric water body from v12 while reducing bulk opacity to avoid over-blocking near-surface objects.
+  - Build tag bumped to `webgpu-volumetric-water-v14`.
+- 2026-02-23: Water coverage + underwater readability stabilization (v15).
+  - Pulled the official Three.js source for `webgpu_backdrop_water` into local temp file for direct reference:
+    - `.three_webgpu_backdrop_water_example.html`
+  - Removed rendered volumetric side/bottom layers from lake water meshes to eliminate interior flashing/z-sorting artifacts.
+  - Kept refractive water surface shader and increased lake depth profile (`depth = 2.3 + seed * 1.4`) so bottoms are less visible/flickery.
+  - Improved underwater gameplay readability:
+    - Added underwater visual mode (fog/background/exposure switch + overlay) when camera is below water level.
+    - Water surface now renders `FrontSide` only to avoid “blue wall” appearance when player is below surface.
+  - Retuned lake floor vertex colors from bright water-blue to muted underwater ground tones.
+  - Build tag bumped to `webgpu-water-coverage-v15`.
+- 2026-02-23: Hard rollback of broken v15 behavior + lake-surface rewrite (v16).
+  - Restored visible water from all camera angles by switching water surface rendering back to `DoubleSide`.
+  - Replaced chunk-tile water filling with a stable per-lake surface approach:
+    - One circular, smooth water mesh per deterministic lake descriptor.
+    - Visibility of lake meshes synced to currently loaded chunks (`syncVisibleLakes`), avoiding chunk seam artifacts.
+  - Removed chunk-key-based water lifecycle assumptions that caused inconsistent lake cleanup.
+  - Kept underwater view mode support while removing the patch that made lakes appear empty from inside.
+  - Build tag bumped to `webgpu-lake-surface-v16`.
