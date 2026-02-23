@@ -164,3 +164,48 @@ Original prompt: יש לי אפליקציה של webgpu שעובדת בקובץ 
   - Removed chunk-key-based water lifecycle assumptions that caused inconsistent lake cleanup.
   - Kept underwater view mode support while removing the patch that made lakes appear empty from inside.
   - Build tag bumped to `webgpu-lake-surface-v16`.
+- 2026-02-23: Reference-matching pass (v17) after user requested strict parity with Three.js example.
+  - Aligned water shader math with official `webgpu_backdrop_water` values:
+    - `waterColor`: `mix(0x0487e2, 0x74ccf4)` with intensity `1.4`.
+    - `depthEffect`: `remapClamp(-.002, .04)`.
+    - `depthRefraction`: `remapClamp(0, .1)`.
+    - `backdropNode`: `depthEffect.mix(viewportSharedTexture(), refractedViewport)`.
+    - `backdropAlphaNode`: `depthRefraction.oneMinus()`.
+  - Removed round `CircleGeometry` lake surfaces and replaced with generated lake geometry from sampled water mask.
+  - Added generated boundary volume walls per lake to avoid thin “sheet only” visuals at shorelines.
+  - Lake membership for visuals now uses `getLakeAtWater` / `isPointInsideLakeWater` (water exists only where lake bottom is below water level).
+  - Build tag bumped to `webgpu-backdrop-water-reference-v17`.
+- 2026-02-23: Test run after v17 changes.
+  - Ran Playwright client on `http://127.0.0.1:5500/lowpoly-world-webgpu.html`.
+  - Artifacts updated: `output/web-game/shot-0.png`, `output/web-game/errors-0.json`.
+  - Environment still reports `Error: WebGPU is not available`, so visual verification must be done on a local WebGPU-enabled browser.
+- 2026-02-23: Water visibility correction pass (v18) for near-lake color loss.
+  - Root cause: strict v17 depth/refraction thresholds from the official sample were too narrow for this world scale, pushing surface alpha close to transparent.
+  - Adjusted backdrop-water depth ranges for this scene scale:
+    - `depthEffect`: `remapClamp(-.02, 1.8)`
+    - `depthRefraction`: `remapClamp(0, 1.25)`
+  - Added a controlled minimum water visibility floor:
+    - `backdropAlphaNode = depthRefraction.oneMinus().mul(0.78).add(0.22)`
+    - Slight extra tint blend into backdrop to keep lakes visibly blue from above.
+  - Build tag bumped to `webgpu-backdrop-water-visibility-v18`.
+- 2026-02-23: Requested tuning pass (v19): less saturated blue + 30% wider water footprint.
+  - Reduced blue dominance in water optics:
+    - `waterColor` moved to softer palette and lower intensity.
+    - Lowered tint mixing strength in `backdropNode`.
+    - Kept visibility floor but reduced its bias to avoid over-blue look.
+  - Expanded lake water body footprint by 30%:
+    - Added `LAKE_WATER_FOOTPRINT_SCALE = 1.3`.
+    - Applied scaled radius in water inclusion test, chunk-lake intersection, and both generated geometries (surface + volume).
+    - Added controlled shallow fringe allowance so enlarged footprint reaches shore/borders more naturally.
+  - Build tag bumped to `webgpu-backdrop-water-footprint-v19`.
+- 2026-02-23: User-requested simplification (v20): no shoreline fitting, water as flat sunk box body.
+  - Replaced dynamic shoreline-conforming water creation with a simple per-lake `BoxGeometry` water body:
+    - Flat top fixed at lake level.
+    - Body thickness sunk downward from the top.
+  - Water occupancy test simplified to box footprint (`abs(dx)<=half && abs(dz)<=half`) with no edge/bottom fitting calculations.
+  - Removed obsolete shoreline/mesh-fitting helper functions from runtime path to prevent accidental fallback behavior.
+  - Reduced overly strong blue appearance:
+    - Softer `waterColor` palette and reduced intensity.
+    - Lower tint contribution in `backdropNode`.
+    - Slightly lower alpha floor and material opacity.
+  - Build tag bumped to `webgpu-backdrop-water-box-v20`.

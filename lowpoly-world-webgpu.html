@@ -119,7 +119,7 @@ const SHADOW_MAP_SIZE = HIGH_QUALITY ? 1536 : 1024;
 const PIXEL_RATIO_CAP = HIGH_QUALITY ? 1.5 : 1.0;
 const LOOK_PRESET = (new URLSearchParams(location.search).get('look') || 'legacy').toLowerCase();
 const LEGACY_LOOK = LOOK_PRESET !== 'flat';
-const BUILD_TAG = 'webgpu-lake-surface-v16';
+const BUILD_TAG = 'webgpu-backdrop-water-box-v20';
 const AMBIENT_INTENSITY = LEGACY_LOOK ? 0.66 : 0.68;
 const SUN_INTENSITY = LEGACY_LOOK ? 2.9 : 2.35;
 const HEMI_INTENSITY = LEGACY_LOOK ? 0.62 : 0.58;
@@ -237,7 +237,7 @@ function getHeight(wx, wz) {
 
 // Lake detection
 function isLake(wx, wz) {
-  return getLakeAt(wx, wz) !== null;
+  return getLakeAtWater(wx, wz) !== null;
 }
 
 // Path detection
@@ -272,33 +272,35 @@ const matBird = new THREE.MeshPhongMaterial({ color: 0x333333, flatShading: true
 
 // Water (Three.js backdrop water material)
 function makeBackdropWaterMaterial() {
-  const t = time.mul(0.8);
+  const t = time.mul(.8);
   const floorUV = positionWorld.xzy;
 
   const waterLayer0 = mx_worley_noise_float(floorUV.mul(4).add(t));
   const waterLayer1 = mx_worley_noise_float(floorUV.mul(2).add(t));
 
   const waterIntensity = waterLayer0.mul(waterLayer1);
-  const waterColor = waterIntensity.mul(1.35).mix(color(0x0566b5), color(0x53b8ee));
+  const waterColor = waterIntensity.mul(0.98).mix(color(0x2f95cf), color(0x8ecde9));
 
   const depth = linearDepth();
   const depthWater = viewportLinearDepth.sub(depth);
-  // Depth-dependent attenuation: near objects stay visible+refracted, deep bottoms fade out.
-  const depthEffect = depthWater.remapClamp(0.0, 2.6);
+  // Keep official backdrop-water look, but rescale depth ranges for this larger world.
+  const depthEffect = depthWater.remapClamp(-.02, 1.8);
 
-  const refractionUV = screenUV.add(vec2(0, waterIntensity.mul(0.12)));
+  const refractionUV = screenUV.add(vec2(0, waterIntensity.mul(.1)));
   const depthTestForRefraction = linearDepth(viewportDepthTexture(refractionUV)).sub(depth);
-  const depthRefraction = depthTestForRefraction.remapClamp(0, 2.2);
+  const depthRefraction = depthTestForRefraction.remapClamp(0, 1.25);
   const finalUV = depthTestForRefraction.lessThan(0).select(screenUV, refractionUV);
   const viewportTexture = viewportSharedTexture(finalUV);
-  const refractedBackdrop = viewportTexture.mul(depthRefraction.mix(1, waterColor));
+  const refracted = viewportTexture.mul(depthRefraction.mix(1, waterColor));
+  const backdrop = depthEffect.mix(viewportSharedTexture(), refracted);
 
   const waterMaterial = new THREE.MeshBasicNodeMaterial();
   waterMaterial.colorNode = waterColor;
-  waterMaterial.backdropNode = depthEffect.mix(refractedBackdrop, waterColor);
-  waterMaterial.backdropAlphaNode = depthEffect.mul(0.62).add(0.22);
+  waterMaterial.backdropNode = backdrop.mix(waterColor, depthEffect.mul(0.09).add(0.02));
+  // Visibility floor: keep a minimum water body color so nearby lakes don't disappear.
+  waterMaterial.backdropAlphaNode = depthRefraction.oneMinus().mul(0.88).add(0.12);
   waterMaterial.transparent = true;
-  waterMaterial.opacity = 0.96;
+  waterMaterial.opacity = 0.95;
   waterMaterial.side = THREE.DoubleSide;
   waterMaterial.depthWrite = false;
   return waterMaterial;
@@ -464,7 +466,9 @@ function makeFlower(x, y, z, rng=Math.random) {
 const LAKE_CELL = 120;
 const LAKE_MAX_RADIUS = 40;
 const LAKE_EDGE_SOFTNESS = 0.16;
-const lakes = new Map(); // lakeKey -> { surface }
+const LAKE_WATER_FOOTPRINT_SCALE = 1.3;
+const LAKE_MIN_VISIBLE_DEPTH = 0.55;
+const lakes = new Map(); // lakeKey -> { surface, volume }
 const lakeDescriptors = new Map(); // lakeKey -> descriptor | null
 
 function smoothstep01(t) {
@@ -485,6 +489,18 @@ function lakeDepthAtPoint(lake, wx, wz) {
 
 function getLakeBottomHeightForDescriptor(lake, wx, wz) {
   return getHeight(wx, wz) - lakeDepthAtPoint(lake, wx, wz);
+}
+
+function getLakeWaterRadius(lake) {
+  return lake.r * LAKE_WATER_FOOTPRINT_SCALE;
+}
+
+function isPointInsideLakeWater(lake, wx, wz) {
+  if (!lake) return false;
+  const waterRadius = getLakeWaterRadius(lake);
+  const dx = Math.abs(wx - lake.cx);
+  const dz = Math.abs(wz - lake.cz);
+  return dx <= waterRadius && dz <= waterRadius;
 }
 
 function computeLakeProfile(lake) {
@@ -567,6 +583,12 @@ function getLakeAt(wx, wz) {
   return descriptor;
 }
 
+function getLakeAtWater(wx, wz) {
+  const lake = getLakeAt(wx, wz);
+  if (!lake) return null;
+  return isPointInsideLakeWater(lake, wx, wz) ? lake : null;
+}
+
 function getLakeBottomHeight(wx, wz) {
   const lake = getLakeAt(wx, wz);
   if (!lake) return getHeight(wx, wz);
@@ -580,26 +602,29 @@ function chunkIntersectsLake(cx, cz, lake) {
   const maxX = ox + CHUNK_SIZE;
   const minZ = oz;
   const maxZ = oz + CHUNK_SIZE;
+  const waterRadius = getLakeWaterRadius(lake);
 
-  if (lake.cx + lake.r < minX) return false;
-  if (lake.cx - lake.r > maxX) return false;
-  if (lake.cz + lake.r < minZ) return false;
-  if (lake.cz - lake.r > maxZ) return false;
+  if (lake.cx + waterRadius < minX) return false;
+  if (lake.cx - waterRadius > maxX) return false;
+  if (lake.cz + waterRadius < minZ) return false;
+  if (lake.cz - waterRadius > maxZ) return false;
   return true;
 }
 
 function createLakeSurface(lake) {
   if (lakes.has(lake.key)) return;
-  const segs = HIGH_QUALITY ? 160 : 112;
-  const geo = new THREE.CircleGeometry(lake.r, segs);
-  const surface = new THREE.Mesh(geo, sharedBackdropWaterMaterial);
-  surface.rotation.x = -Math.PI / 2;
-  surface.position.set(lake.cx, lake.level, lake.cz);
-  surface.castShadow = false;
-  surface.receiveShadow = false;
-  surface.renderOrder = 2;
-  scene.add(surface);
-  lakes.set(lake.key, { surface });
+  const half = getLakeWaterRadius(lake);
+  const depth = Math.max(LAKE_MIN_VISIBLE_DEPTH, lake.depth * 1.35);
+  const geo = new THREE.BoxGeometry(half * 2, depth, half * 2);
+  const waterBody = new THREE.Mesh(geo, sharedBackdropWaterMaterial);
+  // Keep the water top flat at the lake level, sink thickness downward.
+  waterBody.position.set(lake.cx, lake.level - depth * 0.5, lake.cz);
+  waterBody.castShadow = false;
+  waterBody.receiveShadow = false;
+  waterBody.renderOrder = 2;
+  scene.add(waterBody);
+
+  lakes.set(lake.key, { surface: waterBody, volume: null });
 }
 
 function disposeLakeSurface(lakeKey) {
@@ -608,6 +633,10 @@ function disposeLakeSurface(lakeKey) {
   if (water.surface) {
     scene.remove(water.surface);
     water.surface.geometry.dispose();
+  }
+  if (water.volume) {
+    scene.remove(water.volume);
+    water.volume.geometry.dispose();
   }
   lakes.delete(lakeKey);
 }
@@ -946,7 +975,7 @@ function sampleGround(x, z) {
 
 let underwaterActive = false;
 function updateWaterViewState() {
-  const lake = getLakeAt(playerPos.x, playerPos.z);
+  const lake = getLakeAtWater(playerPos.x, playerPos.z);
   const isUnderwater = !!lake && playerPos.y < lake.level - 0.03;
   if (isUnderwater === underwaterActive) return;
 
