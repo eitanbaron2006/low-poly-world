@@ -1166,8 +1166,19 @@ function buildChunk(cx, cz) {
     const path = !lake && isPath(wx, wz);
     let r,g,b;
     if(lake) { 
-      // Lake bottom - deep dark blue like deep ocean water (0x0A1628 - Deep Navy)
-      r=0.039; g=0.086; b=0.157;
+      // Check if this is lake floor (flat bottom) or lake wall (sloped sides)
+      // Lake floor = height is close to the bottom of the lake
+      // Lake wall = height is significantly higher than the bottom
+      const lakeDesc = getLakeAt(wx, wz);
+      const isLakeFloor = lakeDesc && (h < lakeDesc.bottom + 2.0); // Within 2 units of lake bottom
+      
+      if (isLakeFloor) {
+        // Lake floor - deep dark blue like deep ocean water (0x0A1628 - Deep Navy)
+        r=0.039; g=0.086; b=0.157;
+      } else {
+        // Lake walls - sandy/earthy color like the rest of the terrain
+        r=0.6; g=0.45; b=0.3;
+      }
     }
     else if(path) { r=0.68;g=0.52;b=0.28; }
     else if(h < 1.5) { r=0.6;g=0.45;b=0.3; } // sandy
