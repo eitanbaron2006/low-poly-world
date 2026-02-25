@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<!--
+    Natural lake scene using three.js.
+    
+    This example builds on the official three.js WebGPU water example
+    ("webgpu_backdrop_water") to create a small 3D world.  The water
+    material, which uses Node-based shading and Worley noise to
+    simulate ripples, is copied from the original example.  Around
+    the lake are simple terrain features and a handful of trees to
+    suggest a natural environment.  Controls allow the user to orbit
+    the scene.
+
+    To view this file locally you will need a browser with WebGPU
+    support (Chrome Canary/Edge with the appropriate flags) and
+    served via HTTP (for example, using `npx serve`).  Modern
+    browsers will fall back to WebGL if WebGPU is unavailable, but
+    some of the node-based features may not render correctly on
+    WebGL.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Natural Lake Scene – three.js</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background-color: #000;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      z-index: 100;
+      font-size: 14px;
+    }
+  </style>
+  <!-- Provide an empty favicon to prevent 404 errors on favicon.ico -->
+  <link rel="icon" href="data:image/png;base64,iVBORw0KGgo=">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js",
+        "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.webgpu.js",
+        "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.tsl.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="info">
+    <strong>Natural Lake Scene</strong> – Move with WASD/arrow keys
+  </div>
+  <script type="module">
+    import * as THREE from 'three/webgpu';
+    import {
+      color,
+      vec2,
+      pass,
+      linearDepth,
+      normalWorld,
+      triplanarTexture,
+      texture,
+      objectPosition,
+      screenUV,
+      viewportLinearDepth,
+      viewportDepthTexture,
+      viewportSharedTexture,
+      mx_worley_noise_float,
+      positionWorld,
+      time,
+    } from 'three/tsl';
+    import { gaussianBlur } from 'three/addons/tsl/display/GaussianBlurNode.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Note: we no longer need the ImprovedNoise import as we are not generating
+    // custom terrain for this minimal scene.
+
+    let camera, scene, renderer, controls;
+    let renderPipeline;
+    let timer;
+
+    // Floating objects from the original example
+    let objects;
+    // Parameters controlling the lake's size and shape
+    const lakeRadius = 35;
+    // State for first‑person style controls (translation only)
+    const movement = { forward: false, back: false, left: false, right: false };
+
+// Node-based color for the icosahedron objects. This is declared globally so that the
+// lake bed can reuse the same node when creating its material.
+let iceColorNode;
+
+// A placeholder for the irregular lake shape (unused in this minimal scene)
+let lakeShape;
+
+// We no longer need arrays of angles and radii since the lake is represented
+// as a simple box rather than an irregular shape.
+
+    init();
+    
+    function init() {
+      // Create camera similar to the original example
+      camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.25, 100);
+      camera.position.set(3, 2, 4);
+      camera.lookAt(0, 1, 0);
+
+      // Create scene without fog.  A vertical color gradient is applied in the background.
+      scene = new THREE.Scene();
+      // Removed fog to provide a clear view of the water volume.
+      scene.backgroundNode = normalWorld.y.mix(color(0x0487e2), color(0x0066ff));
+
+      // Lights inspired by the example: a warm sun and two hemisphere lights for sky and water
+      const sunLight = new THREE.DirectionalLight(0xffe499, 5);
+      sunLight.position.set(0.5, 3, 0.5);
+      scene.add(sunLight);
+      const waterAmbientLight = new THREE.HemisphereLight(0x333366, 0x74ccf4, 5);
+      const skyAmbientLight = new THREE.HemisphereLight(0x74ccf4, 0x000000, 1);
+      scene.add(waterAmbientLight);
+      scene.add(skyAmbientLight);
+
+      // Timer for animations
+      timer = new THREE.Timer();
+      timer.connect(document);
+
+      // Create a simple ground plane for context (optional).  In the original example
+      // there is no visible ground under the lake, so to keep the water from turning
+      // green due to the ground showing through, we omit the ground plane.  If you
+      // wish to reintroduce a ground plane, position it far below the lake or use
+      // a hole corresponding to the lake shape so it doesn't show through the water.
+
+      // Create water using node-based material from the backdrop water example
+      {
+        const t = time.mul(0.8);
+        const floorUV = positionWorld.xzy;
+        const waterLayer0 = mx_worley_noise_float(floorUV.mul(4).add(t));
+        const waterLayer1 = mx_worley_noise_float(floorUV.mul(2).add(t));
+        const waterIntensity = waterLayer0.mul(waterLayer1);
+        const waterColor = waterIntensity.mul(1.4).mix(color(0x0487e2), color(0x74ccf4));
+        const depth = linearDepth();
+        // Compute depth of the water and invert it (oneMinus) as in the original example to create a white highlight above the surface
+        const depthWater = viewportLinearDepth.sub(depth).oneMinus();
+        const depthEffect = depthWater.remapClamp(-0.002, 0.04);
+        const refractionUV = screenUV.add(vec2(0, waterIntensity.mul(0.1)));
+        const depthTestForRefraction = linearDepth(viewportDepthTexture(refractionUV)).sub(depth);
+        const depthRefraction = depthTestForRefraction.remapClamp(0, 0.1);
+        const finalUV = depthTestForRefraction.lessThan(0).select(screenUV, refractionUV);
+        const viewportTexture = viewportSharedTexture(finalUV);
+        const waterMaterial = new THREE.MeshBasicNodeMaterial();
+        // Assign the node-based color and backdrop nodes from the original example
+        waterMaterial.colorNode = waterColor;
+        waterMaterial.backdropNode = depthEffect.mix(
+          viewportSharedTexture(),
+          viewportTexture.mul(depthRefraction.mix(1, waterColor))
+        );
+        waterMaterial.backdropAlphaNode = depthRefraction.oneMinus();
+        // Important: prevent the water mesh from writing to the depth buffer so objects beneath
+        // the surface remain visible. Without this, the water will completely occlude the
+        // scene behind it, making the lake opaque. This mirrors the behavior of the
+        // original example where the water is blended via backdrop nodes rather than
+        // depth testing alone.
+        waterMaterial.depthWrite = false;
+        waterMaterial.transparent = true;
+        // Render both sides of the water surface because the extruded geometry has
+        // faces pointing up and down. This ensures the backdrop effect is applied
+        // regardless of the viewing angle.
+        waterMaterial.side = THREE.DoubleSide;
+
+        // Instead of generating an irregular shape, create a simple rectangular water
+        // volume (a thin box).  This matches the original three.js example and
+        // displays the water as a cube so the spheres float above it.  The box
+        // geometry has a small thickness to allow the water material to use the
+        // backdrop node for refraction and depth effects.
+        // Create a thin box to represent the water surface only (no volume).  A
+        // height of 0.02 means the water occupies a negligible thickness; this
+        // allows us to distinguish above and below the water without adding
+        // visible volume.
+        const waterGeometry = new THREE.BoxGeometry(60, 0.02, 60);
+        // Shift the water so that its top surface sits at y = 0 (half the
+        // thickness above and half below)
+        waterGeometry.translate(0, 0.01, 0);
+        const water = new THREE.Mesh(waterGeometry, waterMaterial);
+        water.renderOrder = 1; // draw water after other objects
+        scene.add(water);
+      }
+
+      // Add floating icosahedrons as in the original example
+      {
+        const textureLoader = new THREE.TextureLoader();
+        // Load the same texture used in the three.js example for the ice objects
+        // Load local texture from the project (water.jpg) for the floating objects
+        const iceDiffuse = textureLoader.load('water.jpg');
+        iceDiffuse.wrapS = THREE.RepeatWrapping;
+        iceDiffuse.wrapT = THREE.RepeatWrapping;
+        iceDiffuse.colorSpace = THREE.NoColorSpace;
+        // Assign to the global iceColorNode so that it can be reused for the lake bed material below
+        iceColorNode = triplanarTexture(texture(iceDiffuse)).add(color(0x0066ff)).mul(0.8);
+        const geometry = new THREE.IcosahedronGeometry(1, 3);
+        const material = new THREE.MeshStandardNodeMaterial({ colorNode: iceColorNode });
+        // Arrange icosahedrons in a grid similar to the original example
+        const count = 100;
+        const scale = 3.5;
+        const column = 10;
+        objects = new THREE.Group();
+        for (let i = 0; i < count; i++) {
+          const x = i % column;
+          const y = Math.floor(i / column);
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.set(x * scale, 0, y * scale);
+          mesh.rotation.set(Math.random(), Math.random(), Math.random());
+          objects.add(mesh);
+        }
+        // Position the group so that the icosahedrons are centered over the lake and partially submerged
+        objects.position.set(
+          -((column - 1) * scale) * 0.5,
+          -1,
+          -((count / column) * scale) * 0.5
+        );
+        scene.add(objects);
+      }
+
+      // No additional terrain is created in this minimal scene.  Only the thin
+      // water surface and floating objects remain.
+
+
+      // Renderer and controls
+      renderer = new THREE.WebGPURenderer();
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 0, 0);
+      controls.maxPolarAngle = Math.PI * 0.48;
+      controls.minDistance = 5;
+      controls.maxDistance = 80;
+      controls.autoRotate = false;
+      controls.autoRotateSpeed = 0.0;
+      // Disable camera rotation for a first‑person feel
+      controls.enableRotate = false;
+
+      // Setup post-processing pipeline (blur & vignette) similar to example
+      {
+        const scenePass = pass(scene, camera);
+        const scenePassColor = scenePass.getTextureNode();
+        // Remap the scene depth to a normalized range as in the original example
+        const scenePassDepth = scenePass.getLinearDepthNode().remapClamp(0.3, 0.5);
+        // Mask to determine where blur should be applied based on water height
+        const waterMask = objectPosition(camera).y.greaterThan(screenUV.y.sub(0.5).mul(camera.near));
+        const scenePassColorBlurred = gaussianBlur(scenePassColor);
+        // Set blur direction based on whether the current pixel is water or not; use a stronger blur for water as in the original example
+        scenePassColorBlurred.directionNode = waterMask.select(scenePassDepth, scenePass.getLinearDepthNode().mul(5));
+        const vignette = screenUV.distance(0.5).mul(1.35).clamp().oneMinus();
+        renderPipeline = new THREE.RenderPipeline(renderer);
+        renderPipeline.outputNode = waterMask.select(
+          scenePassColorBlurred,
+          scenePassColorBlurred.mul(color(0x74ccf4)).mul(vignette)
+        );
+      }
+
+      // Resize handling
+      window.addEventListener('resize', onWindowResize);
+      // Handle movement keys for simple first‑person translation (no rotation)
+      window.addEventListener('keydown', (event) => {
+        switch (event.code) {
+          case 'KeyW':
+          case 'ArrowUp':
+            movement.forward = true;
+            break;
+          case 'KeyS':
+          case 'ArrowDown':
+            movement.back = true;
+            break;
+          case 'KeyA':
+          case 'ArrowLeft':
+            movement.left = true;
+            break;
+          case 'KeyD':
+          case 'ArrowRight':
+            movement.right = true;
+            break;
+        }
+      });
+      window.addEventListener('keyup', (event) => {
+        switch (event.code) {
+          case 'KeyW':
+          case 'ArrowUp':
+            movement.forward = false;
+            break;
+          case 'KeyS':
+          case 'ArrowDown':
+            movement.back = false;
+            break;
+          case 'KeyA':
+          case 'ArrowLeft':
+            movement.left = false;
+            break;
+          case 'KeyD':
+          case 'ArrowRight':
+            movement.right = false;
+            break;
+        }
+      });
+      // Start animation loop
+      renderer.setAnimationLoop(animate);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      timer.update();
+      controls.update();
+      // Compute frame delta before using it for movement and animation
+      const delta = timer.getDelta();
+      // Apply simple first‑person translation based on key input. Keep the camera looking at the lake centre.
+      const moveSpeed = 4.0;
+      const deltaMove = moveSpeed * delta;
+      // Compute forward direction toward the origin projected onto the XZ plane
+      const forward = new THREE.Vector3().subVectors(new THREE.Vector3(0, 0, 0), camera.position);
+      forward.y = 0;
+      forward.normalize();
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+      if (movement.forward) camera.position.addScaledVector(forward, deltaMove);
+      if (movement.back) camera.position.addScaledVector(forward, -deltaMove);
+      if (movement.left) camera.position.addScaledVector(right, -deltaMove);
+      if (movement.right) camera.position.addScaledVector(right, deltaMove);
+      camera.lookAt(0, 0, 0);
+      // Animate the icosahedrons: bounce and rotate
+      if (objects) {
+        const timeElapsed = timer.getElapsed();
+        for (const object of objects.children) {
+          // Animate vertical movement: bounce objects relative to their group's base so they stay partially submerged
+          object.position.y = Math.sin(timeElapsed + object.id) * 0.3;
+          // Rotate around the vertical axis
+          object.rotation.y += delta * 0.3;
+        }
+      }
+      renderPipeline.render();
+    }
+  </script>
+</body>
+</html>

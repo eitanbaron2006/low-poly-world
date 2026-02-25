@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>three.js webgpu - backdrop water</title>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+  />
+  <link rel="stylesheet" href="https://threejs.org/examples/example.css" />
+</head>
+<body>
+  <div id="info">
+    <a href="https://threejs.org/" target="_blank" rel="noopener" class="logo-link"></a>
+    <div class="title-wrapper">
+      <a href="https://threejs.org/" target="_blank" rel="noopener">three.js</a><span>Backdrop Water</span>
+    </div>
+    <small>Infinite procedural world | Click to play FPS | W/S by look direction, A/D strafe, Shift boost</small>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.webgpu.js",
+        "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.webgpu.js",
+        "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.tsl.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.1/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three/webgpu";
+    import {
+      color,
+      vec2,
+      pass,
+      linearDepth,
+      normalWorld,
+      triplanarTexture,
+      texture,
+      objectPosition,
+      screenUV,
+      viewportLinearDepth,
+      viewportDepthTexture,
+      viewportSharedTexture,
+      mx_worley_noise_float,
+      positionWorld,
+      time
+    } from "three/tsl";
+    import { gaussianBlur } from "three/addons/tsl/display/GaussianBlurNode.js";
+    import { Inspector } from "three/addons/inspector/Inspector.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
+
+    let camera, scene, renderer;
+    let timer, renderPipeline;
+    let mixer, model, floor, floorPosition, objects;
+    let pointerControls;
+    let worldTiles = [];
+    let worldCenterChunkX = Number.NaN;
+    let worldCenterChunkZ = Number.NaN;
+
+    const movement = {
+      forward: false,
+      back: false,
+      left: false,
+      right: false,
+      boost: false
+    };
+
+    const tempObject = new THREE.Object3D();
+    const tempColor = new THREE.Color();
+    const moveForwardVector = new THREE.Vector3();
+    const moveRightVector = new THREE.Vector3();
+    const moveVector = new THREE.Vector3();
+
+    const LAKE_RADIUS = 25;
+    const LAKE_MARGIN = 2.4;
+    const TILE_SIZE = 72;
+    const TILE_SEGMENTS = 22;
+    const TILE_RADIUS = 2;
+    const MAX_TREES_PER_TILE = 24;
+    const MAX_BUSHES_PER_TILE = 34;
+
+    const groundPalette = {
+      deepWet: new THREE.Color(0x3f7a55),
+      wet: new THREE.Color(0x519153),
+      low: new THREE.Color(0x67b14f),
+      mid: new THREE.Color(0x7ac650),
+      high: new THREE.Color(0x90d85b),
+      ridge: new THREE.Color(0x739d5d),
+      rock: new THREE.Color(0x69756b)
+    };
+
+    const lakePalette = {
+      deep: new THREE.Color(0x1e4d98),
+      mid: new THREE.Color(0x3276be),
+      shallow: new THREE.Color(0x5aa4d8)
+    };
+
+    const leafPalette = [0x3f9c34, 0x58b93f, 0x72cf4f, 0x2f8428];
+    const bushPalette = [0x4a9d35, 0x63b546, 0x79c957, 0x3e872b];
+
+    init();
+
+    function init() {
+      camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.25, 1800);
+      camera.position.set(0, 7.2, 55);
+      camera.lookAt(0, 1.2, 0);
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0xbde6ff, 2200, 7000);
+      scene.backgroundNode = normalWorld.y.mix(color(0xc8ebff), color(0x3b97f4));
+
+      // Midday summer sun around ~45deg elevation.
+      const sunLight = new THREE.DirectionalLight(0xffefb5, 5.2);
+      sunLight.position.set(170, 170, 95);
+      scene.add(sunLight);
+
+      const sunDisc = new THREE.Mesh(
+        new THREE.SphereGeometry(24, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xfff4c6 })
+      );
+      sunDisc.position.set(680, 680, -420);
+      scene.add(sunDisc);
+
+      const fillLight = new THREE.DirectionalLight(0xe6f4ff, 0.5);
+      fillLight.position.set(-140, 105, -100);
+      scene.add(fillLight);
+
+      const waterAmbientLight = new THREE.HemisphereLight(0x81c7ff, 0x8ad0ff, 1.3);
+      const skyAmbientLight = new THREE.HemisphereLight(0xffffff, 0x8cc765, 0.86);
+      const groundBounceLight = new THREE.HemisphereLight(0xfff6d2, 0x76af50, 0.28);
+      scene.add(waterAmbientLight, skyAmbientLight, groundBounceLight);
+
+      timer = new THREE.Timer();
+      timer.connect(document);
+
+      const loader = new GLTFLoader();
+      loader.load(
+        "https://threejs.org/examples/models/gltf/Michelle.glb",
+        (gltf) => {
+          model = gltf.scene;
+          mixer = new THREE.AnimationMixer(model);
+          const action = mixer.clipAction(gltf.animations[0]);
+          action.play();
+          scene.add(model);
+        },
+        undefined,
+        () => {
+          // Keep running even if model loading fails.
+        }
+      );
+
+      const textureLoader = new THREE.TextureLoader();
+      const iceDiffuse = textureLoader.load("https://threejs.org/examples/textures/water.jpg");
+      iceDiffuse.wrapS = THREE.RepeatWrapping;
+      iceDiffuse.wrapT = THREE.RepeatWrapping;
+      iceDiffuse.colorSpace = THREE.NoColorSpace;
+
+      const iceColorNode = triplanarTexture(texture(iceDiffuse)).add(color(0x0066ff)).mul(0.8);
+
+      const iceGeometry = new THREE.IcosahedronGeometry(1, 3);
+      const iceMaterial = new THREE.MeshStandardNodeMaterial({ colorNode: iceColorNode });
+      objects = new THREE.Group();
+
+      const count = 100;
+      const scale = 3.5;
+      const column = 10;
+
+      for (let i = 0; i < count; i++) {
+        const x = i % column;
+        const y = i / column;
+        const mesh = new THREE.Mesh(iceGeometry, iceMaterial);
+        mesh.position.set(x * scale, 0, y * scale);
+        mesh.rotation.set(Math.random(), Math.random(), Math.random());
+        objects.add(mesh);
+      }
+
+      objects.position.set(-((column - 1) * scale) * 0.5, -1, -((count / column) * scale) * 0.5);
+      scene.add(objects);
+
+      const t = time.mul(0.8);
+      const floorUV = positionWorld.xzy;
+      const waterLayer0 = mx_worley_noise_float(floorUV.mul(4).add(t));
+      const waterLayer1 = mx_worley_noise_float(floorUV.mul(2).add(t));
+      const waterIntensity = waterLayer0.mul(waterLayer1);
+      const waterColor = waterIntensity.mul(1.4).mix(color(0x0487e2), color(0x74ccf4));
+
+      const depth = linearDepth();
+      const depthWater = viewportLinearDepth.sub(depth).toInspector("Water / Depth", (node) =>
+        node.oneMinus()
+      );
+      const depthEffect = depthWater.remapClamp(-0.002, 0.04);
+      const refractionUV = screenUV
+        .add(vec2(0, waterIntensity.mul(0.1)))
+        .toInspector("Water / Refraction UV");
+
+      const depthTestForRefraction = linearDepth(viewportDepthTexture(refractionUV)).sub(depth);
+      const depthRefraction = depthTestForRefraction.remapClamp(0, 0.1);
+      const finalUV = depthTestForRefraction.lessThan(0).select(screenUV, refractionUV);
+      const viewportTexture = viewportSharedTexture(finalUV).toInspector(
+        "Water / Viewport Texture + Refraction UV"
+      );
+
+      const waterMaterial = new THREE.MeshBasicNodeMaterial();
+      waterMaterial.colorNode = waterColor.toInspector("Water / Color");
+      waterMaterial.backdropNode = depthEffect.mix(
+        viewportSharedTexture(),
+        viewportTexture.mul(depthRefraction.mix(1, waterColor))
+      );
+      waterMaterial.backdropAlphaNode = depthRefraction.oneMinus();
+      waterMaterial.transparent = true;
+      waterMaterial.depthWrite = false;
+      waterMaterial.side = THREE.DoubleSide;
+
+      const waterGeometry = new THREE.CircleGeometry(LAKE_RADIUS, 64);
+      waterGeometry.rotateX(-Math.PI / 2);
+      const water = new THREE.Mesh(waterGeometry, waterMaterial);
+      water.position.set(0, 0, 0);
+      water.renderOrder = 2;
+      scene.add(water);
+
+      floor = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.1, 1.1, 10),
+        new THREE.MeshStandardNodeMaterial({ colorNode: iceColorNode })
+      );
+      floor.position.set(0, -5, 0);
+      scene.add(floor);
+
+      const waterPosY = positionWorld.y.sub(water.position.y);
+      let transition = waterPosY.add(0.1).saturate().oneMinus();
+      transition = waterPosY.lessThan(0).select(transition, normalWorld.y.mix(transition, 0)).toVar();
+      floor.material.colorNode = transition.mix(iceMaterial.colorNode, iceMaterial.colorNode.add(waterLayer0));
+
+      createProceduralWorld();
+
+      renderer = new THREE.WebGPURenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setAnimationLoop(animate);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.95;
+      renderer.inspector = new Inspector();
+      document.body.appendChild(renderer.domElement);
+
+      pointerControls = new PointerLockControls(camera, renderer.domElement);
+      renderer.domElement.addEventListener("click", () => pointerControls.lock());
+
+      const gui = renderer.inspector.createParameters("Settings");
+      floorPosition = new THREE.Vector3(0, 0.2, 0);
+      gui.add(floorPosition, "y", -1, 1, 0.001).name("floor position");
+
+      const scenePass = pass(scene, camera);
+      const scenePassColor = scenePass.getTextureNode();
+      const scenePassDepth = scenePass.getLinearDepthNode().remapClamp(0.3, 0.5);
+      const scenePassColorBlurred = gaussianBlur(scenePassColor);
+      scenePassColorBlurred.directionNode = scenePassDepth.mul(0.18).add(0.01).toInspector(
+        "Post-Processing / Blur Strength [ Depth ]",
+        (node) => node.toFloat()
+      );
+
+      const vignette = screenUV
+        .distance(0.5)
+        .mul(1.08)
+        .clamp()
+        .oneMinus()
+        .toInspector("Post-Processing / Vignette");
+
+      const underwaterMask = objectPosition(camera).y.lessThan(0.02).toInspector(
+        "Post-Processing / Underwater Mask"
+      );
+      const aboveWaterColor = scenePassColor.mul(vignette.mul(0.02).add(0.98));
+      const underwaterColor = scenePassColorBlurred
+        .mul(color(0x7dc8ff))
+        .mul(vignette.mul(0.22).add(0.78));
+
+      renderPipeline = new THREE.RenderPipeline(renderer);
+      renderPipeline.outputNode = underwaterMask.select(underwaterColor, aboveWaterColor);
+
+      window.addEventListener("resize", onWindowResize);
+      window.addEventListener("keydown", onKeyDown);
+      window.addEventListener("keyup", onKeyUp);
+    }
+
+    function createProceduralWorld() {
+      const shore = new THREE.Mesh(
+        new THREE.RingGeometry(LAKE_RADIUS + 0.4, LAKE_RADIUS + 7.2, 26),
+        new THREE.MeshStandardMaterial({
+          color: 0xa7cb85,
+          roughness: 1,
+          metalness: 0,
+          flatShading: true,
+          side: THREE.DoubleSide
+        })
+      );
+      shore.rotation.x = -Math.PI / 2;
+      shore.position.y = 0.05;
+      scene.add(shore);
+
+      const groundMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.98,
+        metalness: 0,
+        flatShading: true,
+        vertexColors: true
+      });
+
+      const treeTrunkGeometry = new THREE.CylinderGeometry(0.22, 0.32, 2.35, 6);
+      const treeTrunkMaterial = new THREE.MeshStandardMaterial({
+        color: 0x6d472d,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true
+      });
+
+      const treeCanopyGeometry = new THREE.ConeGeometry(1.22, 2.95, 7);
+      const treeCanopyMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true,
+        vertexColors: true
+      });
+
+      const bushGeometry = new THREE.DodecahedronGeometry(0.52, 0);
+      const bushMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true,
+        vertexColors: true
+      });
+
+      const tileCount = (TILE_RADIUS * 2 + 1) * (TILE_RADIUS * 2 + 1);
+
+      for (let i = 0; i < tileCount; i++) {
+        const group = new THREE.Group();
+
+        const groundGeometry = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, TILE_SEGMENTS, TILE_SEGMENTS);
+        groundGeometry.rotateX(-Math.PI / 2);
+        const vertexCount = (TILE_SEGMENTS + 1) * (TILE_SEGMENTS + 1);
+        groundGeometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(vertexCount * 3), 3));
+        const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+        group.add(groundMesh);
+
+        const trunkMesh = new THREE.InstancedMesh(treeTrunkGeometry, treeTrunkMaterial, MAX_TREES_PER_TILE);
+        trunkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        trunkMesh.frustumCulled = false;
+        group.add(trunkMesh);
+
+        const canopyMesh = new THREE.InstancedMesh(treeCanopyGeometry, treeCanopyMaterial, MAX_TREES_PER_TILE);
+        canopyMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        canopyMesh.frustumCulled = false;
+        group.add(canopyMesh);
+
+        const bushMesh = new THREE.InstancedMesh(bushGeometry, bushMaterial, MAX_BUSHES_PER_TILE);
+        bushMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        bushMesh.frustumCulled = false;
+        group.add(bushMesh);
+
+        scene.add(group);
+        worldTiles.push({
+          group,
+          groundMesh,
+          trunkMesh,
+          canopyMesh,
+          bushMesh,
+          chunkX: Number.NaN,
+          chunkZ: Number.NaN
+        });
+      }
+
+      updateProceduralWorld(true);
+    }
+
+    function updateProceduralWorld(force = false) {
+      const centerX = Math.floor((camera.position.x + TILE_SIZE * 0.5) / TILE_SIZE);
+      const centerZ = Math.floor((camera.position.z + TILE_SIZE * 0.5) / TILE_SIZE);
+
+      if (!force && centerX === worldCenterChunkX && centerZ === worldCenterChunkZ) return;
+
+      worldCenterChunkX = centerX;
+      worldCenterChunkZ = centerZ;
+
+      let index = 0;
+      for (let dz = -TILE_RADIUS; dz <= TILE_RADIUS; dz++) {
+        for (let dx = -TILE_RADIUS; dx <= TILE_RADIUS; dx++) {
+          const tile = worldTiles[index++];
+          rebuildTile(tile, centerX + dx, centerZ + dz);
+        }
+      }
+    }
+
+    function rebuildTile(tile, chunkX, chunkZ) {
+      if (tile.chunkX === chunkX && tile.chunkZ === chunkZ) return;
+      tile.chunkX = chunkX;
+      tile.chunkZ = chunkZ;
+
+      const centerX = chunkX * TILE_SIZE;
+      const centerZ = chunkZ * TILE_SIZE;
+      tile.group.position.set(centerX, 0, centerZ);
+
+      const geometry = tile.groundMesh.geometry;
+      const posAttr = geometry.attributes.position;
+      const colorAttr = geometry.attributes.color;
+      const colorArray = colorAttr.array;
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const localX = posAttr.getX(i);
+        const localZ = posAttr.getZ(i);
+        const worldX = centerX + localX;
+        const worldZ = centerZ + localZ;
+        const y = terrainHeight(worldX, worldZ);
+        posAttr.setY(i, y);
+
+        sampleGroundColor(y, worldX, worldZ, tempColor);
+        const c = i * 3;
+        colorArray[c] = tempColor.r;
+        colorArray[c + 1] = tempColor.g;
+        colorArray[c + 2] = tempColor.b;
+      }
+
+      posAttr.needsUpdate = true;
+      colorAttr.needsUpdate = true;
+      geometry.computeVertexNormals();
+
+      rebuildTileTrees(tile, chunkX, chunkZ, centerX, centerZ);
+      rebuildTileBushes(tile, chunkX, chunkZ, centerX, centerZ);
+    }
+
+    function rebuildTileTrees(tile, chunkX, chunkZ, centerX, centerZ) {
+      let treeCount = 0;
+      const attempts = MAX_TREES_PER_TILE * 5;
+
+      for (let i = 0; i < attempts && treeCount < MAX_TREES_PER_TILE; i++) {
+        const rx = hash01(chunkX, chunkZ, i * 2 + 13);
+        const rz = hash01(chunkX, chunkZ, i * 2 + 29);
+        const wx = centerX + (rx * 2 - 1) * (TILE_SIZE * 0.48);
+        const wz = centerZ + (rz * 2 - 1) * (TILE_SIZE * 0.48);
+
+        if (Math.hypot(wx, wz) < LAKE_RADIUS + 8) continue;
+
+        const y = terrainHeight(wx, wz);
+        if (y < 0.5) continue;
+        if (terrainSlope(wx, wz) > 1.85) continue;
+
+        const scale = 0.62 + hash01(chunkX, chunkZ, i * 3 + 47) * 0.95;
+        const rot = hash01(chunkX, chunkZ, i * 5 + 71) * Math.PI * 2;
+
+        tempObject.position.set(wx - centerX, y + 1.18 * scale, wz - centerZ);
+        tempObject.rotation.set(0, rot, 0);
+        tempObject.scale.set(scale, scale, scale);
+        tempObject.updateMatrix();
+        tile.trunkMesh.setMatrixAt(treeCount, tempObject.matrix);
+
+        tempObject.position.set(wx - centerX, y + 3.25 * scale, wz - centerZ);
+        tempObject.rotation.set(0, rot, 0);
+        tempObject.scale.set(scale * 1.18, scale * 1.24, scale * 1.18);
+        tempObject.updateMatrix();
+        tile.canopyMesh.setMatrixAt(treeCount, tempObject.matrix);
+
+        tempColor.setHex(leafPalette[Math.floor(hash01(chunkX, chunkZ, i * 7 + 97) * leafPalette.length)]);
+        tile.canopyMesh.setColorAt(treeCount, tempColor);
+
+        treeCount++;
+      }
+
+      tile.trunkMesh.count = treeCount;
+      tile.canopyMesh.count = treeCount;
+      tile.trunkMesh.instanceMatrix.needsUpdate = true;
+      tile.canopyMesh.instanceMatrix.needsUpdate = true;
+      if (tile.canopyMesh.instanceColor) tile.canopyMesh.instanceColor.needsUpdate = true;
+    }
+
+    function rebuildTileBushes(tile, chunkX, chunkZ, centerX, centerZ) {
+      let bushCount = 0;
+      const attempts = MAX_BUSHES_PER_TILE * 4;
+
+      for (let i = 0; i < attempts && bushCount < MAX_BUSHES_PER_TILE; i++) {
+        const rx = hash01(chunkX, chunkZ, i * 2 + 103);
+        const rz = hash01(chunkX, chunkZ, i * 2 + 149);
+        const wx = centerX + (rx * 2 - 1) * (TILE_SIZE * 0.49);
+        const wz = centerZ + (rz * 2 - 1) * (TILE_SIZE * 0.49);
+
+        if (Math.hypot(wx, wz) < LAKE_RADIUS + 6) continue;
+
+        const y = terrainHeight(wx, wz);
+        if (y < 0.3) continue;
+        if (terrainSlope(wx, wz) > 2.35) continue;
+
+        const scale = 0.45 + hash01(chunkX, chunkZ, i * 5 + 181) * 1.1;
+        const rotX = (hash01(chunkX, chunkZ, i * 5 + 211) - 0.5) * 0.35;
+        const rotY = hash01(chunkX, chunkZ, i * 5 + 233) * Math.PI * 2;
+        const rotZ = (hash01(chunkX, chunkZ, i * 5 + 257) - 0.5) * 0.35;
+
+        tempObject.position.set(wx - centerX, y + 0.22 * scale, wz - centerZ);
+        tempObject.rotation.set(rotX, rotY, rotZ);
+        tempObject.scale.set(scale, scale * (0.7 + hash01(chunkX, chunkZ, i * 7 + 307) * 0.6), scale);
+        tempObject.updateMatrix();
+        tile.bushMesh.setMatrixAt(bushCount, tempObject.matrix);
+
+        tempColor.setHex(bushPalette[Math.floor(hash01(chunkX, chunkZ, i * 9 + 359) * bushPalette.length)]);
+        tile.bushMesh.setColorAt(bushCount, tempColor);
+        bushCount++;
+      }
+
+      tile.bushMesh.count = bushCount;
+      tile.bushMesh.instanceMatrix.needsUpdate = true;
+      if (tile.bushMesh.instanceColor) tile.bushMesh.instanceColor.needsUpdate = true;
+    }
+
+    function terrainHeight(x, z) {
+      const lakeDistance = Math.hypot(x, z);
+      const warpX = x + Math.sin(z * 0.012) * 16;
+      const warpZ = z + Math.cos(x * 0.011) * 16;
+
+      const macro =
+        Math.sin(warpX * 0.016) * 3.2 +
+        Math.cos(warpZ * 0.014) * 2.8 +
+        Math.sin((warpX + warpZ) * 0.0085) * 2.1;
+      const micro =
+        Math.sin(x * 0.045) * 0.6 +
+        Math.cos(z * 0.041) * 0.55 +
+        Math.sin((x - z) * 0.029) * 0.45;
+
+      const lakeBowl = Math.max(0, 1 - lakeDistance / (LAKE_RADIUS + 7)) * 9.6;
+      const shoreLift = Math.max(0, 1 - Math.abs(lakeDistance - (LAKE_RADIUS + 8)) / 10) * 1.6;
+      let y = 2.2 + macro + micro + shoreLift - lakeBowl;
+
+      // Enforce a guaranteed bowl around the lake so ground never floats above the water surface.
+      if (lakeDistance < LAKE_RADIUS + LAKE_MARGIN) {
+        const edge = THREE.MathUtils.clamp(lakeDistance / (LAKE_RADIUS + LAKE_MARGIN), 0, 1);
+        const forcedLakeY = THREE.MathUtils.lerp(-8.2, -1.4, edge);
+        y = Math.min(y, forcedLakeY);
+      }
+
+      return y;
+    }
+
+    function terrainSlope(x, z) {
+      const e = 1.2;
+      const dx = terrainHeight(x + e, z) - terrainHeight(x - e, z);
+      const dz = terrainHeight(x, z + e) - terrainHeight(x, z - e);
+      return Math.abs(dx) + Math.abs(dz);
+    }
+
+    function sampleGroundColor(y, x, z, outColor) {
+      const lakeDistance = Math.hypot(x, z);
+      const t = THREE.MathUtils.clamp;
+      const variation =
+        (Math.sin(x * 0.024) + Math.cos(z * 0.021) + Math.sin((x + z) * 0.017) + 1.2) * 0.25;
+
+      if (lakeDistance < LAKE_RADIUS + LAKE_MARGIN && y < 1.3) {
+        if (y < -5.2) {
+          outColor.copy(lakePalette.deep);
+        } else if (y < -1.6) {
+          outColor.copy(lakePalette.deep).lerp(lakePalette.mid, t((y + 5.2) / 3.6, 0, 1));
+        } else {
+          outColor.copy(lakePalette.mid).lerp(lakePalette.shallow, t((y + 1.6) / 2.9, 0, 1));
+        }
+        outColor.offsetHSL(variation * 0.01, 0.03, variation * 0.03);
+        return;
+      }
+
+      if (y < -2.8) {
+        outColor.copy(groundPalette.deepWet);
+      } else if (y < 0) {
+        outColor.copy(groundPalette.deepWet).lerp(groundPalette.wet, t((y + 2.8) / 2.8, 0, 1));
+      } else if (y < 2.7) {
+        outColor.copy(groundPalette.wet).lerp(groundPalette.low, t(y / 2.7, 0, 1));
+      } else if (y < 5.8) {
+        outColor.copy(groundPalette.low).lerp(groundPalette.mid, t((y - 2.7) / 3.1, 0, 1));
+      } else if (y < 9.1) {
+        outColor.copy(groundPalette.mid).lerp(groundPalette.high, t((y - 5.8) / 3.3, 0, 1));
+      } else if (y < 13.4) {
+        outColor.copy(groundPalette.high).lerp(groundPalette.ridge, t((y - 9.1) / 4.3, 0, 1));
+      } else {
+        outColor.copy(groundPalette.ridge).lerp(groundPalette.rock, t((y - 13.4) / 4, 0, 1));
+      }
+
+      outColor.offsetHSL(variation * 0.01, 0.05, variation * 0.04);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      timer.update();
+      const delta = timer.getDelta();
+
+      if (pointerControls && pointerControls.isLocked) {
+        const speed = (movement.boost ? 34 : 16) * delta;
+        moveVector.set(0, 0, 0);
+
+        if (movement.forward || movement.back) {
+          camera.getWorldDirection(moveForwardVector);
+          if (movement.forward) moveVector.add(moveForwardVector);
+          if (movement.back) moveVector.sub(moveForwardVector);
+        }
+
+        if (movement.left || movement.right) {
+          moveRightVector.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+          if (movement.left) moveVector.sub(moveRightVector);
+          if (movement.right) moveVector.add(moveRightVector);
+        }
+
+        if (moveVector.lengthSq() > 0) {
+          moveVector.normalize().multiplyScalar(speed);
+          camera.position.add(moveVector);
+        }
+      }
+
+      floor.position.y = floorPosition.y - 5;
+      if (model) {
+        mixer.update(delta);
+        model.position.y = floorPosition.y;
+      }
+
+      const elapsed = timer.getElapsed();
+      for (const object of objects.children) {
+        object.position.y = Math.sin(elapsed + object.id) * 0.3;
+        object.rotation.y += delta * 0.3;
+      }
+
+      updateProceduralWorld();
+      renderPipeline.render();
+    }
+
+    function onKeyDown(event) {
+      switch (event.code) {
+        case "KeyW":
+        case "ArrowUp":
+          movement.forward = true;
+          break;
+        case "KeyS":
+        case "ArrowDown":
+          movement.back = true;
+          break;
+        case "KeyA":
+        case "ArrowLeft":
+          movement.left = true;
+          break;
+        case "KeyD":
+        case "ArrowRight":
+          movement.right = true;
+          break;
+        case "ShiftLeft":
+        case "ShiftRight":
+          movement.boost = true;
+          break;
+      }
+    }
+
+    function onKeyUp(event) {
+      switch (event.code) {
+        case "KeyW":
+        case "ArrowUp":
+          movement.forward = false;
+          break;
+        case "KeyS":
+        case "ArrowDown":
+          movement.back = false;
+          break;
+        case "KeyA":
+        case "ArrowLeft":
+          movement.left = false;
+          break;
+        case "KeyD":
+        case "ArrowRight":
+          movement.right = false;
+          break;
+        case "ShiftLeft":
+        case "ShiftRight":
+          movement.boost = false;
+          break;
+      }
+    }
+
+    function hash01(x, z, seed) {
+      const n = Math.sin(x * 127.1 + z * 311.7 + seed * 74.7) * 43758.5453123;
+      return n - Math.floor(n);
+    }
+  </script>
+</body>
+</html>
