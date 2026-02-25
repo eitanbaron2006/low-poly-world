@@ -530,6 +530,7 @@ function computeLakeProfile(lake) {
   let floorMin = Infinity;
   let floorSum = 0;
   let floorCount = 0;
+  let groundSum = 0;  // Also track original ground height (before lake depth)
   const radialSteps = 6;
   for (let rStep = 0; rStep <= radialSteps; rStep++) {
     const rr = (rStep / radialSteps) * (lake.r * 0.95);
@@ -539,14 +540,20 @@ function computeLakeProfile(lake) {
       const wx = lake.cx + Math.cos(a) * rr;
       const wz = lake.cz + Math.sin(a) * rr;
       const h = getLakeBottomHeightForDescriptor(lake, wx, wz);
+      const groundH = getHeight(wx, wz);  // Original ground height
       floorMin = Math.min(floorMin, h);
       floorSum += h;
+      groundSum += groundH;
       floorCount++;
     }
   }
 
   const floorMean = floorSum / Math.max(1, floorCount);
-  const maxAllowed = spillHeight - 0.05;
+  const groundMean = groundSum / Math.max(1, floorCount);  // Average ground height in lake area
+  
+  // CRITICAL FIX: Water level must be BELOW the average ground level
+  // This prevents water from floating above the terrain
+  const maxAllowed = Math.min(spillHeight - 0.05, groundMean - 0.5);
   const targetDepth = THREE.MathUtils.clamp((spillHeight - floorMin) * 0.82, 0.65, lake.depth + 0.35);
 
   let level = floorMin + targetDepth;
