@@ -549,6 +549,7 @@
         g.add(pivot);
 
         const addLeafClump = (parent, offsetY, clumpScale, mIndex) => {
+          if (currentSeason === 'Winter') return; // Bare branches in winter
           const rad = (0.6 + rng(mIndex * 10) * 0.4) * scale * clumpScale;
           const lg = new THREE.IcosahedronGeometry(rad, 0);
           const lm = new THREE.Mesh(lg, leafMats[mIndex % 3]);
@@ -632,26 +633,43 @@
         g.add(tm);
 
         // Canopy cluster
-        const clumpCount = 3 + Math.floor(rng(1) * 3);
-        const cluster = new THREE.Group();
-        cluster.position.set(0, trunkH * 0.9, 0);
+        if (currentSeason !== 'Winter') {
+          const clumpCount = 3 + Math.floor(rng(1) * 3);
+          const cluster = new THREE.Group();
+          cluster.position.set(0, trunkH * 0.9, 0);
 
-        for (let i = 0; i < clumpCount; i++) {
-          const radius = (1.0 + rng(2 + i * 3) * 0.5) * scale;
-          const geo = new THREE.IcosahedronGeometry(radius, 1);
-          // Random offset
-          const ox = (rng(3 + i * 3) - 0.5) * 1.2 * scale;
-          const oy = rng(4 + i * 3) * 1.0 * scale;
-          const oz = (rng(5 + i * 3) - 0.5) * 1.2 * scale;
+          for (let i = 0; i < clumpCount; i++) {
+            const radius = (1.0 + rng(2 + i * 3) * 0.5) * scale;
+            const geo = new THREE.IcosahedronGeometry(radius, 1);
+            // Random offset
+            const ox = (rng(3 + i * 3) - 0.5) * 1.2 * scale;
+            const oy = rng(4 + i * 3) * 1.0 * scale;
+            const oz = (rng(5 + i * 3) - 0.5) * 1.2 * scale;
 
-          const mesh = new THREE.Mesh(geo, leafMats[i % 3]);
-          mesh.position.set(ox, oy, oz);
-          mesh.rotation.y = rng(6 + i * 3) * Math.PI;
-          mesh.scale.y = 0.8 + rng(7 + i * 3) * 0.4;
-          mesh.castShadow = true;
-          cluster.add(mesh);
+            const mesh = new THREE.Mesh(geo, leafMats[i % 3]);
+            mesh.position.set(ox, oy, oz);
+            mesh.rotation.y = rng(6 + i * 3) * Math.PI;
+            mesh.scale.y = 0.8 + rng(7 + i * 3) * 0.4;
+            mesh.castShadow = true;
+            cluster.add(mesh);
+          }
+          g.add(cluster);
+        } else {
+          // Add a couple of bare branches in winter
+          for (let i = 0; i < 2; i++) {
+            const bH = (0.4 + rng(i) * 0.3) * scale;
+            const bg = new THREE.CylinderGeometry(0.02 * scale, 0.05 * scale, bH, 4);
+            const bm = new THREE.Mesh(bg, matTreeTrunk);
+            bm.position.set(0, bH / 2, 0);
+            bm.castShadow = true;
+            const bpivot = new THREE.Group();
+            bpivot.position.set(0, trunkH * (0.6 + rng(i + 10) * 0.3), 0);
+            const bAxis = new THREE.Vector3(Math.cos(rng(i + 20) * Math.PI * 2), 0, Math.sin(rng(i + 20) * Math.PI * 2)).normalize();
+            bpivot.setRotationFromAxisAngle(bAxis, 0.5 + rng(i + 30) * 0.5);
+            bpivot.add(bm);
+            g.add(bpivot);
+          }
         }
-        g.add(cluster);
       }
 
       return g;
@@ -1446,22 +1464,49 @@
     }
 
     // ============================================================
+    // STARFIELD (NIGHT SKY)
+    // ============================================================
+    const starsGeo = new THREE.BufferGeometry();
+    const starsCount = 1500;
+    const starsPos = new Float32Array(starsCount * 3);
+    let starIdx = 0;
+    while (starIdx < starsCount) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos((Math.random() * 2) - 1);
+      // Strictly restrict to upper hemisphere (y > 0) to avoid stars on ground
+      if (phi >= Math.PI / 2) continue;
+
+      const r = 500 + Math.random() * 100;
+      starsPos[starIdx * 3] = r * Math.sin(phi) * Math.cos(theta);
+      starsPos[starIdx * 3 + 1] = r * Math.cos(phi);
+      starsPos[starIdx * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+      starIdx++;
+    }
+    starsGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
+    const starsMat = new THREE.PointsMaterial({
+      color: 0xffffff, size: 2.0, transparent: true, opacity: 0.0, fog: false, depthWrite: false, depthTest: true
+    });
+    const starsSystem = new THREE.Points(starsGeo, starsMat);
+    scene.add(starsSystem);
+
+    // ============================================================
     // WEATHER SYSTEM
     // ============================================================
+    let currentWeatherType = 'Clear'; // 'Clear', 'Snow', 'Rain', 'Wind'
+
     const weatherGeo = new THREE.BufferGeometry();
     const weatherCount = 2000;
     const weatherPositions = new Float32Array(weatherCount * 3);
     const weatherVelocities = new Float32Array(weatherCount * 3);
 
-    // Fill initially
     for (let i = 0; i < weatherCount; i++) {
+      // Spawn particles in a volume around the player
       weatherPositions[i * 3] = (Math.random() - 0.5) * 150;
-      weatherPositions[i * 3 + 1] = Math.random() * 100;
+      weatherPositions[i * 3 + 1] = 10 + Math.random() * 90;
       weatherPositions[i * 3 + 2] = (Math.random() - 0.5) * 150;
-
-      weatherVelocities[i * 3] = (Math.random() - 0.5) * 2;
-      weatherVelocities[i * 3 + 1] = -5 - Math.random() * 5; // Fall speed
-      weatherVelocities[i * 3 + 2] = (Math.random() - 0.5) * 2;
+      weatherVelocities[i * 3] = 0;
+      weatherVelocities[i * 3 + 1] = 0;
+      weatherVelocities[i * 3 + 2] = 0;
     }
 
     weatherGeo.setAttribute('position', new THREE.BufferAttribute(weatherPositions, 3));
@@ -1470,32 +1515,91 @@
       color: 0xffffff,
       size: 0.6,
       transparent: true,
-      opacity: 0.0, // starts invisible (summer)
+      opacity: 0.0,
       depthWrite: false,
+      depthTest: true, // Prevents particles from rendering in front of mountains
       blending: THREE.NormalBlending
     });
 
     const weatherSystem = new THREE.Points(weatherGeo, weatherMat);
     scene.add(weatherSystem);
 
-    function updateWeather(dt) {
-      if (weatherMat.opacity <= 0) return; // skip if clear
+    function setRandomWeatherForSeason() {
+      const rand = Math.random();
+      if (currentSeason === 'Winter') {
+        currentWeatherType = rand > 0.4 ? 'Snow' : 'Clear';
+      } else if (currentSeason === 'Autumn') {
+        currentWeatherType = rand > 0.4 ? (rand > 0.7 ? 'Rain' : 'Wind') : 'Clear';
+      } else if (currentSeason === 'Spring') {
+        currentWeatherType = rand > 0.4 ? (rand > 0.7 ? 'Rain' : 'Wind') : 'Clear';
+      } else {
+        currentWeatherType = rand > 0.8 ? 'Rain' : 'Clear'; // Summer is usually clear
+      }
 
-      // Follow camera on X/Z loosely so we never run out of particles
+      if (currentWeatherType === 'Clear') {
+        weatherMat.opacity = 0.0;
+      } else if (currentWeatherType === 'Snow') {
+        weatherMat.opacity = 0.7;
+        weatherMat.color.setHex(0xffffff);
+        weatherMat.size = 0.8;
+      } else if (currentWeatherType === 'Rain') {
+        weatherMat.opacity = 0.4;
+        weatherMat.color.setHex(0xaaaaaa);
+        weatherMat.size = 0.3;
+      } else if (currentWeatherType === 'Wind') {
+        weatherMat.opacity = 0.9;
+        weatherMat.color.setHex(currentSeason === 'Autumn' ? 0xd35400 : 0xffb6c1);
+        weatherMat.size = 0.6;
+      }
+
+      for (let i = 0; i < weatherCount; i++) {
+        if (currentWeatherType === 'Snow') {
+          weatherVelocities[i * 3] = (Math.random() - 0.5) * 2;
+          weatherVelocities[i * 3 + 1] = -3 - Math.random() * 3;
+          weatherVelocities[i * 3 + 2] = (Math.random() - 0.5) * 2;
+        } else if (currentWeatherType === 'Rain') {
+          weatherVelocities[i * 3] = (Math.random() - 0.5);
+          weatherVelocities[i * 3 + 1] = -15 - Math.random() * 10;
+          weatherVelocities[i * 3 + 2] = (Math.random() - 0.5);
+        } else if (currentWeatherType === 'Wind') {
+          weatherVelocities[i * 3] = 6 + Math.random() * 4;
+          weatherVelocities[i * 3 + 1] = -1 - Math.random() * 2;
+          weatherVelocities[i * 3 + 2] = 2 + Math.random() * 3;
+        }
+      }
+    }
+
+    // Call immediately to set initial weather
+    setRandomWeatherForSeason();
+
+    function updateWeather(dt) {
+      if (weatherMat.opacity <= 0) return;
+
       weatherSystem.position.x = camera.position.x;
       weatherSystem.position.z = camera.position.z;
 
       const pos = weatherGeo.attributes.position.array;
+      const t = performance.now() / 1000;
       for (let i = 0; i < weatherCount; i++) {
-        pos[i * 3] += weatherVelocities[i * 3] * dt;
-        pos[i * 3 + 1] += weatherVelocities[i * 3 + 1] * dt;
-        pos[i * 3 + 2] += weatherVelocities[i * 3 + 2] * dt;
+        let vx = weatherVelocities[i * 3];
+        let vy = weatherVelocities[i * 3 + 1];
+        let vz = weatherVelocities[i * 3 + 2];
 
-        // Loop vertically
-        if (pos[i * 3 + 1] < -10) {
+        if (currentWeatherType === 'Snow') {
+          vx += Math.sin(t * 2 + i) * 0.1;
+          vz += Math.cos(t * 2 + i) * 0.1;
+        } else if (currentWeatherType === 'Wind') {
+          vy += Math.cos(t * 1 + i) * 0.05;
+        }
+
+        pos[i * 3] += vx * dt;
+        pos[i * 3 + 1] += vy * dt;
+        pos[i * 3 + 2] += vz * dt;
+
+        if (pos[i * 3 + 1] < -10 || (currentWeatherType === 'Wind' && pos[i * 3] > 75)) {
           pos[i * 3 + 1] = 80 + Math.random() * 20;
-          // re-randomize x/z
           pos[i * 3] = (Math.random() - 0.5) * 150;
+          if (currentWeatherType === 'Wind') pos[i * 3] = -75; // spawn upwind
           pos[i * 3 + 2] = (Math.random() - 0.5) * 150;
         }
       }
@@ -1999,6 +2103,10 @@
       sunMesh.visible = sunGlow.visible = (sunMesh.position.y > -50);
       moonMesh.visible = moonGlow.visible = (moonMesh.position.y > -50);
 
+      // Star fading at night
+      starsMat.opacity = isDay ? 0 : Math.min(1.0, -elevation * 2.0);
+      starsSystem.position.copy(camera.position);
+
       // Update sky immediately
       let baseBgColor = SKY_BG_COLOR.clone();
       let baseFogColor = SKY_FOG_COLOR.clone();
@@ -2038,15 +2146,6 @@
         matLeaf2.color.setHex(0xe0f7fa);
         matLeaf3.color.setHex(0xb2ebf2);
         matDirt.color.setHex(0xe3ebf0); // snowy dirt
-
-        // Snow weather
-        weatherMat.color.setHex(0xffffff);
-        weatherMat.opacity = 0.8;
-        weatherMat.size = 0.8;
-        for (let i = 0; i < weatherCount; i++) {
-          weatherVelocities[i * 3 + 1] = -3 - Math.random() * 3; // slower fall
-          weatherVelocities[i * 3] = (Math.random() - 0.5) * 2;
-        }
       } else if (currentSeason === 'Autumn') {
         matGrass.color.setHex(0x9a7b4f);
         matDarkGrass.color.setHex(0x8a6335);
@@ -2054,31 +2153,13 @@
         matLeaf2.color.setHex(0xcc2200); // red
         matLeaf3.color.setHex(0xeedd22); // yellow
         matDirt.color.setHex(0x8b5a2b);
-
-        // Falling leaves weather
-        weatherMat.color.setHex(0xd06020);
-        weatherMat.opacity = 0.6;
-        weatherMat.size = 0.5;
-        for (let i = 0; i < weatherCount; i++) {
-          weatherVelocities[i * 3 + 1] = -8 - Math.random() * 4; // faster fall
-          weatherVelocities[i * 3] = 4 + Math.random() * 3; // wind blow to one side
-        }
       } else if (currentSeason === 'Spring') {
         matGrass.color.setHex(0x66cc44);
-        matDarkGrass.color.setHex(0x44aa22);
+        matDarkGrass.color.setHex(0x66cc44); // ensure dark grass matches aesthetic
         matLeaf1.color.setHex(0xffb7c5); // cherry blossom pink
         matLeaf2.color.setHex(0xff99bb); // darker pink
         matLeaf3.color.setHex(0x77ee55); // bright green
         matDirt.color.setHex(0xa0784a);
-
-        // Falling petals weather
-        weatherMat.color.setHex(0xffb7c5);
-        weatherMat.opacity = 0.5;
-        weatherMat.size = 0.4;
-        for (let i = 0; i < weatherCount; i++) {
-          weatherVelocities[i * 3 + 1] = -2 - Math.random() * 2; // slow fall
-          weatherVelocities[i * 3] = 1 + Math.random() * 2; // subtle breeze
-        }
       } else { // Summer
         matGrass.color.setHex(0x5aaf3c);
         matDarkGrass.color.setHex(0x3d8a25);
@@ -2086,10 +2167,9 @@
         matLeaf2.color.setHex(0x4dc535);
         matLeaf3.color.setHex(0x2d8a1a);
         matDirt.color.setHex(0xa0784a);
-
-        // Clear weather
-        weatherMat.opacity = 0.0;
       }
+
+      setRandomWeatherForSeason();
     }
     // Initialize lighting
     updateLighting();
