@@ -687,7 +687,9 @@ function syncVisibleLakes(neededChunkKeys) {
 // DANCING BALLS IN STARTING LAKE (from lake_scene files)
 // ============================================================
 const dancingBalls = [];
+const dancingBallsBodies = []; // Physics bodies for the balls
 let dancingBallsPlatform = null;
+let dancingBallsPlatformBody = null; // Physics body for platform
 let dancingBallsModel = null;
 let dancingBallsMixer = null;
 let startingLake = null;
@@ -769,6 +771,9 @@ function createDancingBalls() {
       dancingBallsModel.scale.set(1, 1, 1);
       scene.add(dancingBallsModel);
       console.log('Dancing model loaded');
+      
+      // Add physics to the dancer model after it loads
+      addDancerPhysics();
     },
     undefined,
     () => {
@@ -779,16 +784,80 @@ function createDancingBalls() {
   console.log('Created', dancingBalls.length, 'floating ice balls');
 }
 
+// Add physics to dancing balls after Rapier is loaded
+function addDancingBallsPhysics() {
+  if (!RAPIER || !physWorld || !startingLake) return;
+  
+  // Add physics to each ball
+  for (const ball of dancingBalls) {
+    const worldPos = new THREE.Vector3();
+    ball.getWorldPosition(worldPos);
+    
+    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(worldPos.x, worldPos.y, worldPos.z);
+    const body = physWorld.createRigidBody(bodyDesc);
+    
+    const colDesc = RAPIER.ColliderDesc.ball(1.0) // radius 1 for icosahedron
+      .setRestitution(0.6)
+      .setFriction(0.3)
+      .setDensity(0.5);
+    physWorld.createCollider(colDesc, body);
+    
+    dancingBallsBodies.push({ mesh: ball, body });
+  }
+  
+  // Add physics to platform (static)
+  if (dancingBallsPlatform) {
+    const platformPos = dancingBallsPlatform.position;
+    const bodyDesc = RAPIER.RigidBodyDesc.fixed()
+      .setTranslation(platformPos.x, platformPos.y, platformPos.z);
+    dancingBallsPlatformBody = physWorld.createRigidBody(bodyDesc);
+    
+    const colDesc = RAPIER.ColliderDesc.cylinder(5, 1.1) // half-height 5, radius 1.1
+      .setRestitution(0.3)
+      .setFriction(0.8);
+    physWorld.createCollider(colDesc, dancingBallsPlatformBody);
+    console.log('Added physics to dancing balls platform');
+  }
+  
+  console.log('Added physics to', dancingBallsBodies.length, 'dancing balls');
+}
+
 function animateDancingBalls(time, dt) {
-  // Animate the floating icosahedron balls (from lake_scene files)
+  // Animate the dancing model
+  if (dancingBallsMixer && dancingBallsModel) {
+    dancingBallsMixer.update(dt);
+  }
+  
+  // Animate the floating icosahedron balls (original animation from lake_scene)
   for (const object of dancingBalls) {
     object.position.y = Math.sin(time + object.id) * 0.3;
     object.rotation.y += dt * 0.3;
   }
   
-  // Animate the dancing model
-  if (dancingBallsMixer && dancingBallsModel) {
-    dancingBallsMixer.update(dt);
+  // Sync physics bodies with animated positions and apply water physics
+  for (let i = 0; i < dancingBallsBodies.length; i++) {
+    const { mesh, body } = dancingBallsBodies[i];
+    const worldPos = new THREE.Vector3();
+    mesh.getWorldPosition(worldPos);
+    
+    // Sync body position with animated mesh position
+    if (typeof body.setTranslation === 'function') {
+      body.setTranslation({ x: worldPos.x, y: worldPos.y, z: worldPos.z }, false);
+    }
+    
+    // Apply water physics if ball is in water
+    if (startingLake && worldPos.y < startingLake.level) {
+      const vel = body.linvel();
+      const waterDrag = 0.92;
+      const buoyancy = 2.0;
+      
+      body.setLinvel({
+        x: vel.x * waterDrag,
+        y: vel.y * waterDrag + buoyancy * dt,
+        z: vel.z * waterDrag
+      }, false);
+    }
   }
 }
 
@@ -856,7 +925,10 @@ function buildChunk(cx, cz) {
     const lake = isLake(wx, wz);
     const path = !lake && isPath(wx, wz);
     let r,g,b;
-    if(lake) { r=0.34;g=0.42;b=0.46; }
+    if(lake) { 
+      // Lake bottom - deep dark blue like deep ocean water (0x0A1628 - Deep Navy)
+      r=0.039; g=0.086; b=0.157;
+    }
     else if(path) { r=0.68;g=0.52;b=0.28; }
     else if(h < 1.5) { r=0.6;g=0.45;b=0.3; } // sandy
     else { // grass variation
@@ -1344,6 +1416,9 @@ async function loadRapier() {
   initPlayerPhysics();
 
   buildTower();
+  
+  // Add physics to dancing balls after Rapier is loaded
+  addDancingBallsPhysics();
 }
 
 function addPhysicsBox(mesh, hw, hh, hd, mass) {
