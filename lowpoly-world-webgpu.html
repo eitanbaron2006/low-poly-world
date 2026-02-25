@@ -572,7 +572,7 @@ function getLakeDescriptor(lx, lz) {
   const cx = lx * LAKE_CELL;
   const cz = lz * LAKE_CELL;
   const r = 15 + seed * 25;
-  const depth = 2.3 + seed * 1.4;
+  const depth = (2.3 + seed * 1.4) * 3;  // 3x deeper lakes
   const descriptor = { key, lx, lz, cx, cz, r, depth, level: 0, bottom: 0 };
   const profile = computeLakeProfile(descriptor);
   descriptor.level = profile.level;
