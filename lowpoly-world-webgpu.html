@@ -6,7 +6,7 @@
 <link rel="icon" href="data:,">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
+body { overflow: hidden; background: #4A90D9; font-family: 'Segoe UI', sans-serif; }
 canvas { display: block; }
 #ui {
   position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
@@ -114,8 +114,8 @@ if (WebGPU.isAvailable() === false) {
 // ============================================================
 const QUALITY_PRESET = (new URLSearchParams(location.search).get('quality') || 'performance').toLowerCase();
 const HIGH_QUALITY = QUALITY_PRESET === 'high' || QUALITY_PRESET === 'ultra';
-const ENABLE_SHADOWS = HIGH_QUALITY;
-const SHADOW_MAP_SIZE = HIGH_QUALITY ? 1536 : 1024;
+const ENABLE_SHADOWS = true;  // Always enable shadows for better visuals
+const SHADOW_MAP_SIZE = HIGH_QUALITY ? 2048 : 1536;  // Larger shadow maps for sharper shadows
 const PIXEL_RATIO_CAP = HIGH_QUALITY ? 1.5 : 1.0;
 const LOOK_PRESET = (new URLSearchParams(location.search).get('look') || 'legacy').toLowerCase();
 const LEGACY_LOOK = LOOK_PRESET !== 'flat';
@@ -123,7 +123,7 @@ const BUILD_TAG = 'webgpu-backdrop-water-box-v20';
 const AMBIENT_INTENSITY = LEGACY_LOOK ? 0.66 : 0.68;
 const SUN_INTENSITY = LEGACY_LOOK ? 2.9 : 2.35;
 const HEMI_INTENSITY = LEGACY_LOOK ? 0.62 : 0.58;
-const TONE_EXPOSURE = LEGACY_LOOK ? 1.16 : 1.14;
+const TONE_EXPOSURE = LEGACY_LOOK ? 1.18 : 1.12;  // Balanced summer exposure
 
 window.__buildInfo = {
   build: BUILD_TAG,
@@ -142,8 +142,8 @@ const CELL = CHUNK_SIZE / CHUNK_SEGS;
 // ============================================================
 // SCENE SETUP
 // ============================================================
-const SKY_BG_COLOR = new THREE.Color(0x87CEEB);
-const SKY_FOG_COLOR = new THREE.Color(0xC8E8FF);
+const SKY_BG_COLOR = new THREE.Color(0x4A90D9);  // Deep summer midday blue
+const SKY_FOG_COLOR = new THREE.Color(0x87CEEB);  // Light sky blue for fog gradient
 const SKY_FOG_NEAR = 200;
 const SKY_FOG_FAR = 600;
 const UNDERWATER_BG_COLOR = new THREE.Color(0x5d98bc);
@@ -170,38 +170,50 @@ camera.position.set(0, 5, 0);
 const underwaterOverlay = document.getElementById('underwater-overlay');
 
 // ============================================================
-// LIGHTING  (noon sun)
+// LIGHTING  (bright summer noon sun)
 // ============================================================
-const ambient = new THREE.AmbientLight(0xfff5e0, AMBIENT_INTENSITY);
+const ambient = new THREE.AmbientLight(0xfff8e7, 0.5);  // Warm ambient for summer feel
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xFFF8DC, SUN_INTENSITY);
-sun.position.set(30, 120, 30);
+const sun = new THREE.DirectionalLight(0xFFFAF0, 2.8);  // Balanced warm white sun
+sun.position.set(200, 250, 150);  // Fixed world position - never moves
 sun.castShadow = ENABLE_SHADOWS;
 if (ENABLE_SHADOWS) {
   sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-  sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 500;
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -200;
-  sun.shadow.camera.right = sun.shadow.camera.top = 200;
-  sun.shadow.bias = -0.001;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 800;
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -400;
+  sun.shadow.camera.right = sun.shadow.camera.top = 400;
+  sun.shadow.bias = -0.0002;
+  sun.shadow.normalBias = 0.02;
 }
 scene.add(sun);
 
-// Hemisphere fill
-const hemi = new THREE.HemisphereLight(0x87CEEB, 0x4a7c59, HEMI_INTENSITY);
+// Hemisphere fill - sky blue from above, warm ground bounce
+const hemi = new THREE.HemisphereLight(0x6BB3F8, 0x8B7355, 0.6);
 scene.add(hemi);
 
 // Extra sky fill to keep dark objects readable without changing their material.
-const skyFill = new THREE.HemisphereLight(0xb7dcff, 0x6f8a72, LEGACY_LOOK ? 0.34 : 0.24);
+const skyFill = new THREE.HemisphereLight(0x87CEEB, 0x6f8a72, 0.28);
 scene.add(skyFill);
 
-// Sun disc in sky
-const sunGeo = new THREE.SphereGeometry(8, 8, 8);
-const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFDE7 });
+// Sun disc in sky - larger and more radiant (fixed position)
+const sunGeo = new THREE.SphereGeometry(15, 16, 16);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFACD });
 const sunMesh = new THREE.Mesh(sunGeo, sunMat);
-sunMesh.position.copy(sun.position).multiplyScalar(4);
+sunMesh.position.set(400, 500, 300);  // Fixed position in sky
 scene.add(sunMesh);
+
+// Sun glow halo effect
+const glowGeo = new THREE.SphereGeometry(25, 16, 16);
+const glowMat = new THREE.MeshBasicMaterial({ 
+  color: 0xFFF8DC, 
+  transparent: true, 
+  opacity: 0.25 
+});
+const sunGlow = new THREE.Mesh(glowGeo, glowMat);
+sunGlow.position.copy(sunMesh.position);
+scene.add(sunGlow);
 
 // ============================================================
 // NOISE  (simple deterministic)
@@ -1156,8 +1168,8 @@ function animate() {
   }
 
   
-  sun.position.set(playerPos.x+30, 120, playerPos.z+30);
-  sunMesh.position.set(playerPos.x+120, 480, playerPos.z+120);
+  // Sun and shadows are completely fixed in world space - no movement
+  // Sun disc and glow positions are set once at initialization
 
   // Step physics
   stepPhysics(dt);
