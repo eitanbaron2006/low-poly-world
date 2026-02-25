@@ -6,7 +6,7 @@
 <link rel="icon" href="data:,">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { overflow: hidden; background: #4A90D9; font-family: 'Segoe UI', sans-serif; }
+body { overflow: hidden; background: #5DADE2; font-family: 'Segoe UI', sans-serif; }
 canvas { display: block; }
 #ui {
   position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
@@ -142,8 +142,8 @@ const CELL = CHUNK_SIZE / CHUNK_SEGS;
 // ============================================================
 // SCENE SETUP
 // ============================================================
-const SKY_BG_COLOR = new THREE.Color(0x4A90D9);  // Deep summer midday blue
-const SKY_FOG_COLOR = new THREE.Color(0x87CEEB);  // Light sky blue for fog gradient
+const SKY_BG_COLOR = new THREE.Color(0x5DADE2);  // Bright summer midday blue - clear sky
+const SKY_FOG_COLOR = new THREE.Color(0xAED6F1);  // Light horizon blue for fog gradient
 const SKY_FOG_NEAR = 200;
 const SKY_FOG_FAR = 600;
 const UNDERWATER_BG_COLOR = new THREE.Color(0x5d98bc);
@@ -190,11 +190,11 @@ if (ENABLE_SHADOWS) {
 scene.add(sun);
 
 // Hemisphere fill - sky blue from above, warm ground bounce
-const hemi = new THREE.HemisphereLight(0x6BB3F8, 0x8B7355, 0.6);
+const hemi = new THREE.HemisphereLight(0x5DADE2, 0x8B7355, 0.6);
 scene.add(hemi);
 
 // Extra sky fill to keep dark objects readable without changing their material.
-const skyFill = new THREE.HemisphereLight(0x87CEEB, 0x6f8a72, 0.28);
+const skyFill = new THREE.HemisphereLight(0xAED6F1, 0x6f8a72, 0.28);
 scene.add(skyFill);
 
 // Sun disc in sky - larger and more radiant (fixed position)
@@ -282,39 +282,36 @@ const matFlower3 = new THREE.MeshPhongMaterial({ color: 0xff6b35, flatShading: t
 const matBush = new THREE.MeshPhongMaterial({ color: 0x2e7d32, flatShading: true, shininess: 0 });
 const matBird = new THREE.MeshPhongMaterial({ color: 0x333333, flatShading: true, shininess: 0 });
 
-// Water (Three.js backdrop water material)
+// Water material - exact implementation from lake_scene (15).html
 function makeBackdropWaterMaterial() {
-  const t = time.mul(.8);
+  const t = time.mul(0.8);
   const floorUV = positionWorld.xzy;
-
   const waterLayer0 = mx_worley_noise_float(floorUV.mul(4).add(t));
   const waterLayer1 = mx_worley_noise_float(floorUV.mul(2).add(t));
-
   const waterIntensity = waterLayer0.mul(waterLayer1);
-  const waterColor = waterIntensity.mul(0.98).mix(color(0x2f95cf), color(0x8ecde9));
-
+  const waterColor = waterIntensity.mul(1.4).mix(color(0x0487e2), color(0x74ccf4));
   const depth = linearDepth();
-  const depthWater = viewportLinearDepth.sub(depth);
-  // Keep official backdrop-water look, but rescale depth ranges for this larger world.
-  const depthEffect = depthWater.remapClamp(-.02, 1.8);
-
-  const refractionUV = screenUV.add(vec2(0, waterIntensity.mul(.1)));
+  // Compute depth of the water and invert it (oneMinus) as in the original example
+  const depthWater = viewportLinearDepth.sub(depth).oneMinus();
+  const depthEffect = depthWater.remapClamp(-0.002, 0.04);
+  const refractionUV = screenUV.add(vec2(0, waterIntensity.mul(0.1)));
   const depthTestForRefraction = linearDepth(viewportDepthTexture(refractionUV)).sub(depth);
-  const depthRefraction = depthTestForRefraction.remapClamp(0, 1.25);
+  const depthRefraction = depthTestForRefraction.remapClamp(0, 0.1);
   const finalUV = depthTestForRefraction.lessThan(0).select(screenUV, refractionUV);
   const viewportTexture = viewportSharedTexture(finalUV);
-  const refracted = viewportTexture.mul(depthRefraction.mix(1, waterColor));
-  const backdrop = depthEffect.mix(viewportSharedTexture(), refracted);
-
   const waterMaterial = new THREE.MeshBasicNodeMaterial();
+  // Assign the node-based color and backdrop nodes from the original example
   waterMaterial.colorNode = waterColor;
-  waterMaterial.backdropNode = backdrop.mix(waterColor, depthEffect.mul(0.09).add(0.02));
-  // Visibility floor: keep a minimum water body color so nearby lakes don't disappear.
-  waterMaterial.backdropAlphaNode = depthRefraction.oneMinus().mul(0.88).add(0.12);
-  waterMaterial.transparent = true;
-  waterMaterial.opacity = 0.95;
-  waterMaterial.side = THREE.DoubleSide;
+  waterMaterial.backdropNode = depthEffect.mix(
+    viewportSharedTexture(),
+    viewportTexture.mul(depthRefraction.mix(1, waterColor))
+  );
+  waterMaterial.backdropAlphaNode = depthRefraction.oneMinus();
+  // Important: prevent the water mesh from writing to the depth buffer
   waterMaterial.depthWrite = false;
+  waterMaterial.transparent = true;
+  // Render both sides of the water surface
+  waterMaterial.side = THREE.DoubleSide;
   return waterMaterial;
 }
 
@@ -1090,6 +1087,12 @@ function animate() {
         if(keys['KeyD']||keys['ArrowRight']) mv.add(rgtH);
         if(mv.lengthSq() > 0) mv.normalize();
 
+        // Check if player is in water
+        const playerLake = getLakeAtWater(playerPos.x, playerPos.z);
+        const inWater = playerLake && playerPos.y < playerLake.level;
+        const waterSpeedMult = inWater ? 0.5 : 1.0;  // Slower in water
+        const actualSpd = spd * waterSpeedMult;
+
         // Ground check via raycast
         const origin = playerBody.translation();
         const ray = new RAPIER.Ray({ x: origin.x, y: origin.y, z: origin.z }, { x: 0, y: -1, z: 0 });
@@ -1098,11 +1101,17 @@ function animate() {
         isGrounded = !!hit;
 
         const cur = playerBody.linvel();
-        const desired = { x: mv.x * spd, y: cur.y, z: mv.z * spd };
+        const desired = { x: mv.x * actualSpd, y: cur.y, z: mv.z * actualSpd };
 
+        // Jump (weaker in water)
         if(keys['Space'] && isGrounded && (now - lastJumpTime) > 250) {
-          desired.y = JUMP_VEL;
+          desired.y = inWater ? JUMP_VEL * 0.5 : JUMP_VEL;
           lastJumpTime = now;
+        }
+        
+        // Swim up in water
+        if(inWater && keys['Space']) {
+          desired.y = Math.max(desired.y, 4);
         }
 
         if(typeof playerBody.setLinvel === 'function') {
@@ -1472,12 +1481,60 @@ function stepPhysics(dt) {
   physWorld.timestep = dt;
   physWorld.step();
 
+  // Apply water physics to all rigid bodies
   for(const rb of rigidBodies) {
     if(rb.body.isFixed()) continue;
     const t = rb.body.translation();
     const r = rb.body.rotation();
     rb.mesh.position.set(t.x, t.y, t.z);
     rb.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+    
+    // Check if in water
+    const lake = getLakeAtWater(t.x, t.z);
+    if(lake && t.y < lake.level) {
+      const vel = rb.body.linvel();
+      const waterDrag = 0.88;
+      const buoyancy = 3.5;
+      
+      const newVel = {
+        x: vel.x * waterDrag,
+        y: vel.y * waterDrag + buoyancy * dt,
+        z: vel.z * waterDrag
+      };
+      
+      if(typeof rb.body.setLinvel === 'function') {
+        rb.body.setLinvel(newVel, false);
+      }
+    }
+  }
+
+  // Apply water physics to projectiles
+  for(const p of projectiles) {
+    const t = p.body.translation();
+    const lake = getLakeAtWater(t.x, t.z);
+    
+    if(lake && t.y < lake.level) {
+      // Object is in water - apply drag and buoyancy
+      const vel = p.body.linvel();
+      const waterDrag = 0.92;  // Slow down in water
+      const buoyancy = 2.5;    // Upward force
+      
+      // Apply water drag (slow down horizontal movement)
+      const newVel = {
+        x: vel.x * waterDrag,
+        y: vel.y * waterDrag + buoyancy * dt,  // Buoyancy pushes up
+        z: vel.z * waterDrag
+      };
+      
+      if(typeof p.body.setLinvel === 'function') {
+        p.body.setLinvel(newVel, false);
+      }
+      
+      // Change projectile color when in water
+      if(p.mesh.material.color.getHex() !== 0x1a4a6e) {
+        p.mesh.material.color.setHex(0x1a4a6e);
+      }
+    }
   }
 
   // Sync player camera position from Rapier body
