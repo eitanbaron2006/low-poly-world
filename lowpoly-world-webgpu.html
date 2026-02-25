@@ -684,6 +684,183 @@ function syncVisibleLakes(neededChunkKeys) {
 }
 
 // ============================================================
+// WATER FOAM SYSTEM - Splash on entry + foam at waterline for floating objects
+// ============================================================
+const splashEffects = []; // Temporary splash effects that fade out
+const waterlineFoams = new Map(); // Persistent foam for floating objects (object -> foam data)
+
+// Simple white circle for splash
+function createSplash(x, z, radius, lake) {
+  const segments = 12;
+  const points = [];
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+  }
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+  const splash = new THREE.Line(geometry, material);
+  splash.position.set(x, lake.level + 0.01, z);
+  splash.userData = { born: performance.now(), duration: 2000, lake }; // 2 seconds
+  scene.add(splash);
+  splashEffects.push(splash);
+}
+
+// Foam arc at waterline - only where object penetrates water surface
+function createWaterlineFoam(obj, objPos, objRadius, lake) {
+  // Create a small arc/semicircle at the water entry point
+  // This represents foam only at the waterline, not around the whole object
+  const segments = 8;
+  const points = [];
+  const arcAngle = Math.PI; // Half circle - only at penetration point
+  
+  for (let i = 0; i <= segments; i++) {
+    const angle = -Math.PI / 2 + (i / segments) * arcAngle;
+    points.push(new THREE.Vector3(
+      Math.cos(angle) * objRadius * 0.3,
+      0,
+      Math.sin(angle) * objRadius * 0.3
+    ));
+  }
+  
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+  const foam = new THREE.Line(geometry, material);
+  foam.position.set(objPos.x, lake.level + 0.01, objPos.z);
+  foam.userData = { obj, lake, radius: objRadius };
+  scene.add(foam);
+  return foam;
+}
+
+// Track objects that just entered water (for splash)
+const waterEntryTracker = new Map(); // object id -> { wasInWater, entryTime }
+
+function updateFoamSystem(dt) {
+  const now = performance.now();
+  
+  // Update and remove expired splash effects
+  for (let i = splashEffects.length - 1; i >= 0; i--) {
+    const splash = splashEffects[i];
+    const age = now - splash.userData.born;
+    const progress = age / splash.userData.duration;
+    
+    if (progress >= 1) {
+      scene.remove(splash);
+      splash.geometry.dispose();
+      splash.material.dispose();
+      splashEffects.splice(i, 1);
+    } else {
+      // Fade out and expand
+      splash.material.opacity = 0.8 * (1 - progress);
+      splash.scale.setScalar(1 + progress * 2);
+    }
+  }
+  
+  // Process projectiles for splash and waterline foam
+  for (const p of projectiles) {
+    const t = p.body.translation();
+    const lake = getLakeAtWater(t.x, t.z);
+    const objId = p.mesh.uuid;
+    const isInWater = lake && t.y < lake.level;
+    const wasTracked = waterEntryTracker.get(objId);
+    
+    if (isInWater) {
+      if (!wasTracked || !wasTracked.wasInWater) {
+        // Just entered water - create splash
+        createSplash(t.x, t.z, 0.5, lake);
+        waterEntryTracker.set(objId, { wasInWater: true, entryTime: now, lake });
+      }
+      
+      // Check if floating (partially above water)
+      const objRadius = p.mesh.geometry?.boundingSphere?.radius || 0.25;
+      const isFloating = t.y + objRadius > lake.level && t.y - objRadius < lake.level;
+      
+      if (isFloating) {
+        // Update or create waterline foam
+        if (!waterlineFoams.has(objId)) {
+          const foam = createWaterlineFoam(p, t, objRadius, lake);
+          waterlineFoams.set(objId, { foam, obj: p, lake });
+        } else {
+          const foamData = waterlineFoams.get(objId);
+          foamData.foam.position.set(t.x, lake.level + 0.01, t.z);
+        }
+      } else {
+        // Fully submerged - remove waterline foam
+        if (waterlineFoams.has(objId)) {
+          const foamData = waterlineFoams.get(objId);
+          scene.remove(foamData.foam);
+          foamData.foam.geometry.dispose();
+          foamData.foam.material.dispose();
+          waterlineFoams.delete(objId);
+        }
+      }
+    } else {
+      // Not in water - clean up
+      if (waterlineFoams.has(objId)) {
+        const foamData = waterlineFoams.get(objId);
+        scene.remove(foamData.foam);
+        foamData.foam.geometry.dispose();
+        foamData.foam.material.dispose();
+        waterlineFoams.delete(objId);
+      }
+      waterEntryTracker.set(objId, { wasInWater: false, entryTime: null });
+    }
+  }
+  
+  // Process rigid bodies for splash and waterline foam
+  for (const rb of rigidBodies) {
+    if (rb.body.isFixed()) continue;
+    const t = rb.body.translation();
+    const lake = getLakeAtWater(t.x, t.z);
+    const objId = rb.mesh.uuid;
+    const isInWater = lake && t.y < lake.level;
+    const wasTracked = waterEntryTracker.get(objId);
+    
+    if (isInWater) {
+      if (!wasTracked || !wasTracked.wasInWater) {
+        // Just entered water - create splash
+        createSplash(t.x, t.z, 0.8, lake);
+        waterEntryTracker.set(objId, { wasInWater: true, entryTime: now, lake });
+      }
+      
+      // Check if floating (partially above water)
+      const objRadius = rb.mesh.geometry?.boundingSphere?.radius || 0.6;
+      const isFloating = t.y + objRadius > lake.level && t.y - objRadius < lake.level;
+      
+      if (isFloating) {
+        // Update or create waterline foam
+        if (!waterlineFoams.has(objId)) {
+          const foam = createWaterlineFoam(rb, t, objRadius, lake);
+          waterlineFoams.set(objId, { foam, obj: rb, lake });
+        } else {
+          const foamData = waterlineFoams.get(objId);
+          foamData.foam.position.set(t.x, lake.level + 0.01, t.z);
+        }
+      } else {
+        // Fully submerged - remove waterline foam
+        if (waterlineFoams.has(objId)) {
+          const foamData = waterlineFoams.get(objId);
+          scene.remove(foamData.foam);
+          foamData.foam.geometry.dispose();
+          foamData.foam.material.dispose();
+          waterlineFoams.delete(objId);
+        }
+      }
+    } else {
+      // Not in water - clean up
+      if (waterlineFoams.has(objId)) {
+        const foamData = waterlineFoams.get(objId);
+        scene.remove(foamData.foam);
+        foamData.foam.geometry.dispose();
+        foamData.foam.material.dispose();
+        waterlineFoams.delete(objId);
+      }
+      waterEntryTracker.set(objId, { wasInWater: false, entryTime: null });
+    }
+  }
+}
+
+// ============================================================
 // DANCING BALLS IN STARTING LAKE (from lake_scene files)
 // ============================================================
 const dancingBalls = [];
@@ -1364,6 +1541,9 @@ function animate() {
   // Animate dancing balls in starting lake
   const animTime = performance.now() / 1000;
   animateDancingBalls(animTime, dt);
+  
+  // Update foam system (splash + waterline foam)
+  updateFoamSystem(dt);
   
   // Sun and shadows are completely fixed in world space - no movement
   // Sun disc and glow positions are set once at initialization
