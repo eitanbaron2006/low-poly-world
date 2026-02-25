@@ -485,7 +485,7 @@
         const offX = (r8 - 0.5) * s * 1.4;
         const offZ = (r9 - 0.5) * s * 1.4;
         // Get terrain height at companion position relative to group origin
-        const groundOff = getHeight(x + offX, z + offZ) - getHeight(x, z);
+        const groundOff = getMeshHeight(x + offX, z + offZ) - getMeshHeight(x, z);
         const mat2 = new THREE.MeshPhongMaterial({ color: 0x72726a, flatShading: true, shininess: 3 });
         const r2m = new THREE.Mesh(makeRockGeo(s2), mat2);
         r2m.scale.set(1.0 + r7 * 0.3, scaleY2, 1.0 + r7 * 0.3);
@@ -496,7 +496,7 @@
       }
 
       // Group origin = exact terrain height at rock center
-      const groundY = getAvgHeight(x, z, s * 0.6);
+      const groundY = getMeshAvgHeight(x, z, s * 0.6);
       g.position.set(x, groundY, z);
       return g;
     }
@@ -695,6 +695,34 @@
       const lake = getLakeAt(wx, wz);
       if (!lake) return getHeight(wx, wz);
       return getLakeBottomHeightForDescriptor(lake, wx, wz);
+    }
+
+    // Calculates the exact height of the terrain surface at any given world position,
+    // accounting for the low-poly triangulation used in the chunk mesh.
+    function getMeshHeight(wx, wz) {
+      const cellX = Math.floor(wx / CELL);
+      const cellZ = Math.floor(wz / CELL);
+
+      const fx = (wx - cellX * CELL) / CELL;
+      const fz = (wz - cellZ * CELL) / CELL;
+
+      const h00 = getLakeBottomHeight(cellX * CELL, cellZ * CELL);
+      const h10 = getLakeBottomHeight((cellX + 1) * CELL, cellZ * CELL);
+      const h01 = getLakeBottomHeight(cellX * CELL, (cellZ + 1) * CELL);
+      const h11 = getLakeBottomHeight((cellX + 1) * CELL, (cellZ + 1) * CELL);
+
+      if (fx + fz <= 1) {
+        return h00 + fx * (h10 - h00) + fz * (h01 - h00);
+      } else {
+        return h11 + (1 - fx) * (h01 - h11) + (1 - fz) * (h10 - h11);
+      }
+    }
+
+    function getMeshAvgHeight(x, z, radius) {
+      return Math.min(
+        getMeshHeight(x, z), getMeshHeight(x + radius, z), getMeshHeight(x - radius, z),
+        getMeshHeight(x, z + radius), getMeshHeight(x, z - radius)
+      );
     }
 
     function chunkIntersectsLake(cx, cz, lake) {
@@ -1345,7 +1373,7 @@
         const tx = ox + rng(i * 7 + 2) * CHUNK_SIZE;
         const tz = oz + rng(i * 7 + 3) * CHUNK_SIZE;
         if (isLake(tx, tz) || isPath(tx, tz)) continue;
-        const h = getHeight(tx, tz);   // exact height at this world pos
+        const h = getMeshHeight(tx, tz);   // exact height at this world pos
         if (h < 1) continue;
         const r4 = rng(i * 7 + 4);
         let obj;
