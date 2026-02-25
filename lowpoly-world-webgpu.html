@@ -1,70 +1,146 @@
 <!DOCTYPE html>
 <html lang="he">
-<head>
-<meta charset="UTF-8">
-<title>🌿 עולם ירוק - Lowpoly World (WebGPU)</title>
-<link rel="icon" href="data:,">
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { overflow: hidden; background: #5DADE2; font-family: 'Segoe UI', sans-serif; }
-canvas { display: block; }
-#ui {
-  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-  color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-  text-align: center; pointer-events: none;
-  font-size: 14px; letter-spacing: 1px;
-}
-#crosshair {
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  width: 20px; height: 20px; pointer-events: none;
-}
-#crosshair::before, #crosshair::after {
-  content: ''; position: absolute; background: rgba(255,255,255,0.8);
-  border-radius: 2px;
-}
-#crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
-#crosshair::after { width: 100%; height: 2px; top: 50%; transform: translateY(-50%); }
-#instructions {
-  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-  color: rgba(255,255,255,0.9); text-align: center; font-size: 13px;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.6); pointer-events: none;
-  background: rgba(0,0,0,0.2); padding: 8px 16px; border-radius: 20px;
-  backdrop-filter: blur(4px);
-}
-#underwater-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 140ms linear;
-  background:
-    radial-gradient(circle at 50% 42%, rgba(130, 205, 255, 0.12), rgba(24, 74, 116, 0.48)),
-    linear-gradient(to bottom, rgba(120, 198, 245, 0.15), rgba(18, 57, 88, 0.42));
-  mix-blend-mode: screen;
-}
-#click-to-start {
-  position: fixed; inset: 0; background: rgba(0,20,0,0.7);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: white; cursor: pointer; z-index: 100;
-  backdrop-filter: blur(8px);
-}
-#click-to-start h1 { font-size: 48px; margin-bottom: 12px; text-shadow: 0 0 30px rgba(100,255,100,0.5); }
-#click-to-start p { font-size: 18px; opacity: 0.8; }
-#click-to-start .subtitle { font-size: 14px; opacity: 0.5; margin-top: 8px; }
-</style>
-</head>
-<body>
-<div id="click-to-start">
-  <h1>🌿 עולם ירוק</h1>
-  <p>לחץ כדי להתחיל לחקור</p>
-  <div class="subtitle">לחץ כדי לנעול עכבר ולהתחיל</div>
-</div>
-<div id="ui">🌿 Lowpoly World</div>
-<div id="crosshair"></div>
-<div id="instructions">WASD - תנועה | עכבר - מבט | Space - קפיצה | Shift - ריצה | F - עף | לחיצה שמאל - ירי | R - בנה מגדל חדש</div>
-<div id="underwater-overlay"></div>
 
-<script type="importmap">
+<head>
+  <meta charset="UTF-8">
+  <title>🌿 עולם ירוק - Lowpoly World (WebGPU)</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      background: #5DADE2;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #ui {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      pointer-events: none;
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+    }
+
+    #crosshair::before,
+    #crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 2px;
+    }
+
+    #crosshair::before {
+      width: 2px;
+      height: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    #crosshair::after {
+      width: 100%;
+      height: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    #instructions {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+      font-size: 13px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px 16px;
+      border-radius: 20px;
+      backdrop-filter: blur(4px);
+    }
+
+    #underwater-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 140ms linear;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(130, 205, 255, 0.12), rgba(24, 74, 116, 0.48)),
+        linear-gradient(to bottom, rgba(120, 198, 245, 0.15), rgba(18, 57, 88, 0.42));
+      mix-blend-mode: screen;
+    }
+
+    #click-to-start {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 20, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+
+    #click-to-start h1 {
+      font-size: 48px;
+      margin-bottom: 12px;
+      text-shadow: 0 0 30px rgba(100, 255, 100, 0.5);
+    }
+
+    #click-to-start p {
+      font-size: 18px;
+      opacity: 0.8;
+    }
+
+    #click-to-start .subtitle {
+      font-size: 14px;
+      opacity: 0.5;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="click-to-start">
+    <h1>🌿 עולם ירוק</h1>
+    <p>לחץ כדי להתחיל לחקור</p>
+    <div class="subtitle">לחץ כדי לנעול עכבר ולהתחיל</div>
+  </div>
+  <div id="ui">🌿 Lowpoly World</div>
+  <div id="crosshair"></div>
+  <div id="instructions">WASD - תנועה | עכבר - מבט | Space - קפיצה | Shift - ריצה | F - עף | לחיצה שמאל - ירי | R - בנה
+    מגדל חדש</div>
+  <div id="underwater-overlay"></div>
+
+  <script type="importmap">
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.webgpu.js",
@@ -75,2039 +151,2046 @@ canvas { display: block; }
 }
 </script>
 
-<script type="module">
-import * as THREE from 'three/webgpu';
-import WebGPU from 'three/addons/capabilities/WebGPU.js';
-import {
-  color,
-  vec2,
-  linearDepth,
-  positionWorld,
-  screenUV,
-  viewportDepthTexture,
-  viewportLinearDepth,
-  viewportSharedTexture,
-  mx_worley_noise_float,
-  time,
-  triplanarTexture,
-  texture,
-  normalWorld
-} from 'three/tsl';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  <script type="module">
+    import * as THREE from 'three/webgpu';
+    import WebGPU from 'three/addons/capabilities/WebGPU.js';
+    import {
+      color,
+      vec2,
+      linearDepth,
+      positionWorld,
+      screenUV,
+      viewportDepthTexture,
+      viewportLinearDepth,
+      viewportSharedTexture,
+      mx_worley_noise_float,
+      time,
+      triplanarTexture,
+      texture,
+      normalWorld
+    } from 'three/tsl';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-function showWebGPUError(msg) {
-  const overlay = document.getElementById('click-to-start');
-  overlay.style.display = 'flex';
-  overlay.innerHTML = `
+    function showWebGPUError(msg) {
+      const overlay = document.getElementById('click-to-start');
+      overlay.style.display = 'flex';
+      overlay.innerHTML = `
     <h1>WebGPU לא זמין</h1>
     <p>${msg}</p>
     <div class="subtitle">נסה להריץ דרך localhost/https ולעדכן דרייבר/דפדפן.</div>
   `;
-  document.getElementById('ui').textContent = 'WebGPU לא זמין';
-}
-
-if (WebGPU.isAvailable() === false) {
-  showWebGPUError('הדפדפן או החומרה לא תומכים כרגע ב-WebGPU.');
-  const details = WebGPU.getErrorMessage?.();
-  if (details) document.body.appendChild(details);
-  throw new Error('WebGPU is not available');
-}
-
-// ============================================================
-// PLANET RADIUS & WORLD CONSTANTS
-// ============================================================
-const QUALITY_PRESET = (new URLSearchParams(location.search).get('quality') || 'performance').toLowerCase();
-const HIGH_QUALITY = QUALITY_PRESET === 'high' || QUALITY_PRESET === 'ultra';
-const ENABLE_SHADOWS = true;  // Always enable shadows for better visuals
-const SHADOW_MAP_SIZE = HIGH_QUALITY ? 2048 : 1536;  // Larger shadow maps for sharper shadows
-const PIXEL_RATIO_CAP = HIGH_QUALITY ? 1.5 : 1.0;
-const LOOK_PRESET = (new URLSearchParams(location.search).get('look') || 'legacy').toLowerCase();
-const LEGACY_LOOK = LOOK_PRESET !== 'flat';
-const BUILD_TAG = 'webgpu-backdrop-water-box-v20';
-const AMBIENT_INTENSITY = LEGACY_LOOK ? 0.66 : 0.68;
-const SUN_INTENSITY = LEGACY_LOOK ? 2.9 : 2.35;
-const HEMI_INTENSITY = LEGACY_LOOK ? 0.62 : 0.58;
-const TONE_EXPOSURE = LEGACY_LOOK ? 1.18 : 1.12;  // Balanced summer exposure
-
-window.__buildInfo = {
-  build: BUILD_TAG,
-  quality: QUALITY_PRESET,
-  look: LOOK_PRESET
-};
-console.log('[Build]', window.__buildInfo);
-document.title = `Lowpoly World WebGPU (${BUILD_TAG})`;
-
-const PLANET_R = 800;          // effective "flat" radius before curvature kicks in
-const CHUNK_SIZE = 64;
-const CHUNK_SEGS = 16;
-const RENDER_CHUNKS = HIGH_QUALITY ? 5 : 4; // chunks in each direction
-const CELL = CHUNK_SIZE / CHUNK_SEGS;
-
-// ============================================================
-// SCENE SETUP
-// ============================================================
-const SKY_BG_COLOR = new THREE.Color(0x5DADE2);  // Bright summer midday blue - clear sky
-const SKY_FOG_COLOR = new THREE.Color(0xAED6F1);  // Light horizon blue for fog gradient
-const SKY_FOG_NEAR = 200;
-const SKY_FOG_FAR = 600;
-const UNDERWATER_BG_COLOR = new THREE.Color(0x5d98bc);
-const UNDERWATER_FOG_COLOR = new THREE.Color(0x4a7ea6);
-const UNDERWATER_FOG_NEAR = 0.8;
-const UNDERWATER_FOG_FAR = 46;
-
-const scene = new THREE.Scene();
-scene.background = SKY_BG_COLOR.clone();
-scene.fog = new THREE.Fog(SKY_FOG_COLOR.clone(), SKY_FOG_NEAR, SKY_FOG_FAR);
-
-const renderer = new THREE.WebGPURenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, PIXEL_RATIO_CAP));
-renderer.shadowMap.enabled = ENABLE_SHADOWS;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = TONE_EXPOSURE;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-document.body.appendChild(renderer.domElement);
-
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 700);
-camera.position.set(0, 5, 0);
-const underwaterOverlay = document.getElementById('underwater-overlay');
-
-// ============================================================
-// LIGHTING  (bright summer noon sun)
-// ============================================================
-const ambient = new THREE.AmbientLight(0xfff8e7, 0.5);  // Warm ambient for summer feel
-scene.add(ambient);
-
-const sun = new THREE.DirectionalLight(0xFFFAF0, 2.8);  // Balanced warm white sun
-sun.position.set(200, 250, 150);  // Fixed world position - never moves
-sun.castShadow = ENABLE_SHADOWS;
-if (ENABLE_SHADOWS) {
-  sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 800;
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -400;
-  sun.shadow.camera.right = sun.shadow.camera.top = 400;
-  sun.shadow.bias = -0.0002;
-  sun.shadow.normalBias = 0.02;
-}
-scene.add(sun);
-
-// Hemisphere fill - sky blue from above, warm ground bounce
-const hemi = new THREE.HemisphereLight(0x5DADE2, 0x8B7355, 0.6);
-scene.add(hemi);
-
-// Extra sky fill to keep dark objects readable without changing their material.
-const skyFill = new THREE.HemisphereLight(0xAED6F1, 0x6f8a72, 0.28);
-scene.add(skyFill);
-
-// Sun disc in sky - larger and more radiant (fixed position)
-const sunGeo = new THREE.SphereGeometry(15, 16, 16);
-const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFACD });
-const sunMesh = new THREE.Mesh(sunGeo, sunMat);
-sunMesh.position.set(400, 500, 300);  // Fixed position in sky
-scene.add(sunMesh);
-
-// Sun glow halo effect
-const glowGeo = new THREE.SphereGeometry(25, 16, 16);
-const glowMat = new THREE.MeshBasicMaterial({ 
-  color: 0xFFF8DC, 
-  transparent: true, 
-  opacity: 0.25 
-});
-const sunGlow = new THREE.Mesh(glowGeo, glowMat);
-sunGlow.position.copy(sunMesh.position);
-scene.add(sunGlow);
-
-// ============================================================
-// NOISE  (simple deterministic)
-// ============================================================
-function hash(x, y) {
-  let n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return n - Math.floor(n);
-}
-function smoothNoise(x, y) {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = x - ix, fy = y - iy;
-  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
-  const a = hash(ix, iy), b = hash(ix+1, iy);
-  const c = hash(ix, iy+1), d = hash(ix+1, iy+1);
-  return a + (b-a)*ux + (c-a)*uy + (d-a+a-b-c+b+c-d)*ux*uy - (c-a)*uy;
-}
-function fbm(x, y, oct=5) {
-  let v=0, amp=1, freq=1, max=0;
-  for(let i=0;i<oct;i++){v+=smoothNoise(x*freq,y*freq)*amp;max+=amp;amp*=0.5;freq*=2.1;}
-  return v/max;
-}
-function getHeight(wx, wz) {
-  const scale = 0.008;
-  let h = fbm(wx*scale, wz*scale, 6);
-  h = Math.pow(h, 1.4) * 28;
-  // rolling hills
-  h += fbm(wx*0.003, wz*0.003, 3) * 8;
-  // flat valleys
-  const valley = smoothNoise(wx*0.004, wz*0.004);
-  if(valley < 0.35) h *= valley / 0.35 * 0.3;
-  return h;
-}
-
-// Lake detection
-function isLake(wx, wz) {
-  return getLakeAtWater(wx, wz) !== null;
-}
-
-// Path detection
-function isPath(wx, wz) {
-  // winding dirt paths using low-freq noise
-  const pathNoise = smoothNoise(wx * 0.02, wz * 0.02 + 100);
-  const offset = (pathNoise - 0.5) * 20;
-  // main path: diagonal
-  const dist1 = Math.abs((wx + wz * 0.7 + offset) % 180 - 90);
-  const dist2 = Math.abs((wx * 0.6 - wz + offset * 0.8) % 200 - 100);
-  return dist1 < 3.5 || dist2 < 2.8;
-}
-
-// ============================================================
-// MATERIALS
-// ============================================================
-const matGrass = new THREE.MeshPhongMaterial({ color: 0x5aaf3c, flatShading: true, shininess: 0 });
-const matDarkGrass = new THREE.MeshPhongMaterial({ color: 0x3d8a25, flatShading: true, shininess: 0 });
-const matDirt = new THREE.MeshPhongMaterial({ color: 0xa0784a, flatShading: true, shininess: 0 });
-const matPath = new THREE.MeshPhongMaterial({ color: 0xb8945a, flatShading: true, shininess: 0 });
-const matRock = new THREE.MeshPhongMaterial({ color: 0x8a8a7a, flatShading: true, shininess: 5 });
-const matRockDark = new THREE.MeshPhongMaterial({ color: 0x6a6a5a, flatShading: true, shininess: 5 });
-const matTreeTrunk = new THREE.MeshPhongMaterial({ color: 0x7a5230, flatShading: true, shininess: 0 });
-const matLeaf1 = new THREE.MeshPhongMaterial({ color: 0x3daa2a, flatShading: true, shininess: 0 });
-const matLeaf2 = new THREE.MeshPhongMaterial({ color: 0x4dc535, flatShading: true, shininess: 0 });
-const matLeaf3 = new THREE.MeshPhongMaterial({ color: 0x2d8a1a, flatShading: true, shininess: 0 });
-const matFlower1 = new THREE.MeshPhongMaterial({ color: 0xf7c94b, flatShading: true, shininess: 10 });
-const matFlower2 = new THREE.MeshPhongMaterial({ color: 0xe84393, flatShading: true, shininess: 10 });
-const matFlower3 = new THREE.MeshPhongMaterial({ color: 0xff6b35, flatShading: true, shininess: 10 });
-const matBush = new THREE.MeshPhongMaterial({ color: 0x2e7d32, flatShading: true, shininess: 0 });
-const matBird = new THREE.MeshPhongMaterial({ color: 0x333333, flatShading: true, shininess: 0 });
-
-// Water material - exact implementation from lake_scene (15).html
-function makeBackdropWaterMaterial() {
-  const t = time.mul(0.8);
-  const floorUV = positionWorld.xzy;
-  const waterLayer0 = mx_worley_noise_float(floorUV.mul(4).add(t));
-  const waterLayer1 = mx_worley_noise_float(floorUV.mul(2).add(t));
-  const waterIntensity = waterLayer0.mul(waterLayer1);
-  const waterColor = waterIntensity.mul(1.4).mix(color(0x0487e2), color(0x74ccf4));
-  const depth = linearDepth();
-  // Compute depth of the water and invert it (oneMinus) as in the original example
-  const depthWater = viewportLinearDepth.sub(depth).oneMinus();
-  const depthEffect = depthWater.remapClamp(-0.002, 0.04);
-  const refractionUV = screenUV.add(vec2(0, waterIntensity.mul(0.1)));
-  const depthTestForRefraction = linearDepth(viewportDepthTexture(refractionUV)).sub(depth);
-  const depthRefraction = depthTestForRefraction.remapClamp(0, 0.1);
-  const finalUV = depthTestForRefraction.lessThan(0).select(screenUV, refractionUV);
-  const viewportTexture = viewportSharedTexture(finalUV);
-  const waterMaterial = new THREE.MeshBasicNodeMaterial();
-  // Assign the node-based color and backdrop nodes from the original example
-  waterMaterial.colorNode = waterColor;
-  waterMaterial.backdropNode = depthEffect.mix(
-    viewportSharedTexture(),
-    viewportTexture.mul(depthRefraction.mix(1, waterColor))
-  );
-  waterMaterial.backdropAlphaNode = depthRefraction.oneMinus();
-  // Important: prevent the water mesh from writing to the depth buffer
-  waterMaterial.depthWrite = false;
-  waterMaterial.transparent = true;
-  // Render both sides of the water surface
-  waterMaterial.side = THREE.DoubleSide;
-  return waterMaterial;
-}
-
-const sharedBackdropWaterMaterial = makeBackdropWaterMaterial();
-// ============================================================
-// GEOMETRY HELPERS
-// ============================================================
-function jitter(geo, amount = 0.3) {
-  const pos = geo.attributes.position;
-  for(let i = 0; i < pos.count; i++) {
-    pos.setXYZ(i,
-      pos.getX(i) + (Math.random()-0.5)*amount,
-      pos.getY(i) + (Math.random()-0.5)*amount*0.5,
-      pos.getZ(i) + (Math.random()-0.5)*amount
-    );
-  }
-  pos.needsUpdate = true;
-  geo.computeVertexNormals();
-  return geo;
-}
-
-function makeTree(x, y, z, scale=1, rng=Math.random) {
-  const g = new THREE.Group();
-  const h = (1.8 + rng(0)*1.2) * scale;
-  const tg = new THREE.CylinderGeometry(0.1*scale, 0.18*scale, h, 5);
-  const tm = new THREE.Mesh(tg, matTreeTrunk);
-  tm.position.set(0, h/2, 0);
-  tm.castShadow = true;
-  g.add(tm);
-  const leafMats = [matLeaf1, matLeaf2, matLeaf3];
-  const layers = 3 + Math.floor(rng(1)*2);
-  for(let i=0;i<layers;i++) {
-    const r = (1.3 - i*0.22) * scale;
-    const lh = (1.0 + rng(i*3+2)*0.3) * scale;
-    const lg = new THREE.ConeGeometry(r, lh, 6);
-    const lm = new THREE.Mesh(lg, leafMats[i%3]);
-    lm.position.set(0, h + i * (lh * 0.52), 0);
-    lm.rotation.y = (rng(i*3+3) + i*0.5)*Math.PI;
-    lm.castShadow = true;
-    g.add(lm);
-  }
-  g.position.set(x, y, z);
-  return g;
-}
-
-function toFlat(geo) {
-  // Only call toNonIndexed if geometry IS indexed (has an index buffer)
-  const flat = geo.index ? geo.toNonIndexed() : geo;
-  flat.computeVertexNormals();
-  return flat;
-}
-
-function makeRockGeo(s) {
-  return toFlat(new THREE.IcosahedronGeometry(s, 1));
-}
-
-function makeRock(x, y, z, rng) {
-  const g = new THREE.Group();
-  const r0=rng(0),r1=rng(1),r2=rng(2),r3=rng(3),r4=rng(4),
-        r5=rng(5),r6=rng(6),r7=rng(7),r8=rng(8),r9=rng(9);
-
-  const s      = 0.5 + r0 * 1.0;
-  const scaleX = 0.9  + r3 * 0.5;
-  const scaleY = 0.38 + r2 * 0.18;   // how flat the rock is (0.38-0.56)
-  const scaleZ = 0.85 + r4 * 0.5;
-
-  // The rock mesh is an IcosahedronGeometry centered at origin.
-  // Its top is at +s*scaleY, its bottom is at -s*scaleY (in local space).
-  // We want the BOTTOM to sit at terrain height, so we lift the mesh by s*scaleY.
-  // Then we sink it INTO the ground by 30% of its height (heavier = bigger s = more sink).
-  const halfH   = s * scaleY;          // half-height of rock after Y scale
-  const sinkFrac = 0.25 + r0 * 0.20;  // 25%-45% of halfH sinks below ground
-  const liftY   = halfH - halfH * sinkFrac;  // net lift = bottom + partial sink
-
-  const col = r1 < 0.5 ? 0x8a8a7a : 0x6e7060;
-  const mat = new THREE.MeshPhongMaterial({ color: col, flatShading: true, shininess: 3 });
-  const rm  = new THREE.Mesh(makeRockGeo(s), mat);
-  rm.scale.set(scaleX, scaleY, scaleZ);
-  rm.rotation.y    = r5 * Math.PI * 2;
-  rm.position.y    = liftY;    // sit on ground, partially embedded
-  rm.castShadow    = true;
-  rm.receiveShadow = true;
-  g.add(rm);
-
-  // Companion rock - same logic, positioned relative to group
-  if(r6 < 0.55) {
-    const s2       = s * (0.28 + r7 * 0.32);
-    const scaleY2  = 0.4 + r8 * 0.18;
-    const halfH2   = s2 * scaleY2;
-    const liftY2   = halfH2 * 0.70;   // 30% sunk
-    const offX     = (r8 - 0.5) * s * 1.4;
-    const offZ     = (r9 - 0.5) * s * 1.4;
-    // Get terrain height at companion position relative to group origin
-    const groundOff = getHeight(x + offX, z + offZ) - getHeight(x, z);
-    const mat2 = new THREE.MeshPhongMaterial({ color: 0x72726a, flatShading: true, shininess: 3 });
-    const r2m  = new THREE.Mesh(makeRockGeo(s2), mat2);
-    r2m.scale.set(1.0 + r7*0.3, scaleY2, 1.0 + r7*0.3);
-    r2m.position.set(offX, groundOff + liftY2, offZ);
-    r2m.rotation.y = r9 * Math.PI * 2;
-    r2m.castShadow = true;
-    g.add(r2m);
-  }
-
-  // Group origin = exact terrain height at rock center
-  const groundY = getAvgHeight(x, z, s * 0.6);
-  g.position.set(x, groundY, z);
-  return g;
-}
-
-function makeBush(x, y, z, rng) {
-  const g = new THREE.Group();
-  const s = 0.5 + rng(0)*0.7;
-  const cols = [0x2e7d32, 0x388e3c, 0x43a047, 0x1b5e20];
-  const count = 2 + Math.floor(rng(1)*3);
-  for(let i=0;i<count;i++) {
-    const r = s*(0.45+rng(i*4+2)*0.45);
-    const sg = new THREE.IcosahedronGeometry(r, 1);
-    const col = cols[Math.floor(rng(i*4+3)*cols.length)];
-    const sm = new THREE.Mesh(sg, new THREE.MeshPhongMaterial({color: col, flatShading: true, shininess: 0}));
-    // Y: embed half-radius into ground so bushes sit on terrain
-    sm.position.set((rng(i*4+4)-0.5)*s*1.2, r*0.45, (rng(i*4+5)-0.5)*s*1.2);
-    sm.scale.y = 0.65 + rng(i*4+6)*0.25;
-    sm.castShadow = true;
-    g.add(sm);
-  }
-  g.position.set(x, y, z);
-  return g;
-}
-
-function makeFlower(x, y, z, rng=Math.random) {
-  const g = new THREE.Group();
-  const flowerCols = [0xf7c94b, 0xe84393, 0xff6b35, 0xff4488, 0xffcc00, 0xff8833];
-  const col = flowerCols[Math.floor(Math.random()*flowerCols.length)];
-  const mat = new THREE.MeshPhongMaterial({ color: col, flatShading: true, shininess: 5 });
-  const stemMat = new THREE.MeshPhongMaterial({ color: 0x3a8a2a, flatShading: true, shininess: 0 });
-
-  const stemH = 0.25 + Math.random()*0.2;
-  // Stem
-  const stemG = new THREE.CylinderGeometry(0.018, 0.022, stemH, 4);
-  const stemM = new THREE.Mesh(stemG, stemMat);
-  stemM.position.y = stemH * 0.5;
-  g.add(stemM);
-
-  // Flower head: use OctahedronGeometry - 8 faces, naturally cute & lowpoly
-  const headSize = 0.12 + Math.random()*0.09;
-  const headGeo = new THREE.OctahedronGeometry(headSize, 0);
-  headGeo.computeVertexNormals();
-  const headM = new THREE.Mesh(headGeo, mat);
-  headM.position.y = stemH + headSize * 0.7;
-  headM.rotation.y = Math.random()*Math.PI;
-  headM.scale.y = 0.75;
-  g.add(headM);
-
-  g.position.set(x, y, z);
-  return g;
-}
-
-// ============================================================
-// LAKE MESH
-// ============================================================
-const LAKE_CELL = 120;
-const LAKE_MAX_RADIUS = 40;
-const LAKE_EDGE_SOFTNESS = 0.16;
-const LAKE_WATER_FOOTPRINT_SCALE = 1.3;
-const LAKE_MIN_VISIBLE_DEPTH = 0.55;
-const lakes = new Map(); // lakeKey -> { surface, volume }
-const lakeDescriptors = new Map(); // lakeKey -> descriptor | null
-
-function smoothstep01(t) {
-  const x = Math.min(1, Math.max(0, t));
-  return x * x * (3 - 2 * x);
-}
-
-function lakeDepthAtPoint(lake, wx, wz) {
-  const dx = wx - lake.cx;
-  const dz = wz - lake.cz;
-  const dist = Math.sqrt(dx * dx + dz * dz);
-  if (dist >= lake.r) return 0;
-  const edgeStart = lake.r * (1 - LAKE_EDGE_SOFTNESS);
-  const edgeT = (dist - edgeStart) / Math.max(0.0001, lake.r - edgeStart);
-  const fade = 1 - smoothstep01(edgeT);
-  return lake.depth * fade;
-}
-
-function getLakeBottomHeightForDescriptor(lake, wx, wz) {
-  return getHeight(wx, wz) - lakeDepthAtPoint(lake, wx, wz);
-}
-
-function getLakeWaterRadius(lake) {
-  return lake.r * LAKE_WATER_FOOTPRINT_SCALE;
-}
-
-function isPointInsideLakeWater(lake, wx, wz) {
-  if (!lake) return false;
-  const waterRadius = getLakeWaterRadius(lake);
-  const dx = Math.abs(wx - lake.cx);
-  const dz = Math.abs(wz - lake.cz);
-  return dx <= waterRadius && dz <= waterRadius;
-}
-
-function computeLakeProfile(lake) {
-  const rimSamples = HIGH_QUALITY ? 72 : 56;
-  const rimRadius = lake.r + CELL * 0.8;
-  let spillHeight = Infinity;
-  for (let i = 0; i < rimSamples; i++) {
-    const a = (i / rimSamples) * Math.PI * 2;
-    const wx = lake.cx + Math.cos(a) * rimRadius;
-    const wz = lake.cz + Math.sin(a) * rimRadius;
-    spillHeight = Math.min(spillHeight, getHeight(wx, wz));
-  }
-
-  let floorMin = Infinity;
-  let floorSum = 0;
-  let floorCount = 0;
-  let groundSum = 0;  // Also track original ground height (before lake depth)
-  const radialSteps = 6;
-  for (let rStep = 0; rStep <= radialSteps; rStep++) {
-    const rr = (rStep / radialSteps) * (lake.r * 0.95);
-    const ringCount = Math.max(10, Math.round((HIGH_QUALITY ? 54 : 40) * (0.35 + 0.65 * (rr / lake.r))));
-    for (let i = 0; i < ringCount; i++) {
-      const a = (i / ringCount) * Math.PI * 2;
-      const wx = lake.cx + Math.cos(a) * rr;
-      const wz = lake.cz + Math.sin(a) * rr;
-      const h = getLakeBottomHeightForDescriptor(lake, wx, wz);
-      const groundH = getHeight(wx, wz);  // Original ground height
-      floorMin = Math.min(floorMin, h);
-      floorSum += h;
-      groundSum += groundH;
-      floorCount++;
-    }
-  }
-
-  const floorMean = floorSum / Math.max(1, floorCount);
-  const groundMean = groundSum / Math.max(1, floorCount);  // Average ground height in lake area
-  
-  // CRITICAL FIX: Water level must be BELOW the average ground level
-  // This prevents water from floating above the terrain
-  const maxAllowed = Math.min(spillHeight - 0.05, groundMean - 0.5);
-  const targetDepth = THREE.MathUtils.clamp((spillHeight - floorMin) * 0.82, 0.65, lake.depth + 0.35);
-
-  let level = floorMin + targetDepth;
-  level = Math.min(level, maxAllowed);
-  level = Math.max(level, floorMean + 0.18);
-  level = Math.max(level, floorMin + 0.35);
-
-  if (!Number.isFinite(level)) level = getHeight(lake.cx, lake.cz) - 0.2;
-
-  let bottom = Math.min(floorMin, level - 0.95);
-  if (!Number.isFinite(bottom)) bottom = level - 1.1;
-  bottom = Math.min(bottom, level - 0.3);
-
-  return { level, bottom, floorMin, floorMean, spillHeight };
-}
-
-function getLakeDescriptor(lx, lz) {
-  const key = `${lx},${lz}`;
-  if (lakeDescriptors.has(key)) return lakeDescriptors.get(key);
-
-  const seed = hash(lx * 17.3, lz * 31.7);
-  if (seed >= 0.18) {
-    lakeDescriptors.set(key, null);
-    return null;
-  }
-
-  const cx = lx * LAKE_CELL;
-  const cz = lz * LAKE_CELL;
-  const r = 15 + seed * 25;
-  const depth = (2.3 + seed * 1.4) * 3;  // 3x deeper lakes
-  const descriptor = { key, lx, lz, cx, cz, r, depth, level: 0, bottom: 0 };
-  const profile = computeLakeProfile(descriptor);
-  descriptor.level = profile.level;
-  descriptor.bottom = profile.bottom;
-  lakeDescriptors.set(key, descriptor);
-  return descriptor;
-}
-
-function getLakeAt(wx, wz) {
-  const lx = Math.floor(wx / LAKE_CELL + 0.5);
-  const lz = Math.floor(wz / LAKE_CELL + 0.5);
-  const descriptor = getLakeDescriptor(lx, lz);
-  if (!descriptor) return null;
-  const dx = wx - descriptor.cx;
-  const dz = wz - descriptor.cz;
-  if (dx * dx + dz * dz >= descriptor.r * descriptor.r) return null;
-  return descriptor;
-}
-
-function getLakeAtWater(wx, wz) {
-  const lake = getLakeAt(wx, wz);
-  if (!lake) return null;
-  return isPointInsideLakeWater(lake, wx, wz) ? lake : null;
-}
-
-function getLakeBottomHeight(wx, wz) {
-  const lake = getLakeAt(wx, wz);
-  if (!lake) return getHeight(wx, wz);
-  return getLakeBottomHeightForDescriptor(lake, wx, wz);
-}
-
-function chunkIntersectsLake(cx, cz, lake) {
-  const ox = cx * CHUNK_SIZE;
-  const oz = cz * CHUNK_SIZE;
-  const minX = ox;
-  const maxX = ox + CHUNK_SIZE;
-  const minZ = oz;
-  const maxZ = oz + CHUNK_SIZE;
-  const waterRadius = getLakeWaterRadius(lake);
-
-  if (lake.cx + waterRadius < minX) return false;
-  if (lake.cx - waterRadius > maxX) return false;
-  if (lake.cz + waterRadius < minZ) return false;
-  if (lake.cz - waterRadius > maxZ) return false;
-  return true;
-}
-
-function createLakeSurface(lake) {
-  if (lakes.has(lake.key)) return;
-  const half = getLakeWaterRadius(lake);
-  const depth = Math.max(LAKE_MIN_VISIBLE_DEPTH, lake.depth * 1.35);
-  const geo = new THREE.BoxGeometry(half * 2, depth, half * 2);
-  const waterBody = new THREE.Mesh(geo, sharedBackdropWaterMaterial);
-  // Keep the water top flat at the lake level, sink thickness downward.
-  waterBody.position.set(lake.cx, lake.level - depth * 0.5, lake.cz);
-  waterBody.castShadow = false;
-  waterBody.receiveShadow = false;
-  waterBody.renderOrder = 2;
-  scene.add(waterBody);
-
-  lakes.set(lake.key, { surface: waterBody, volume: null });
-}
-
-function disposeLakeSurface(lakeKey) {
-  const water = lakes.get(lakeKey);
-  if (!water) return;
-  if (water.surface) {
-    scene.remove(water.surface);
-    water.surface.geometry.dispose();
-  }
-  if (water.volume) {
-    scene.remove(water.volume);
-    water.volume.geometry.dispose();
-  }
-  lakes.delete(lakeKey);
-}
-
-function syncVisibleLakes(neededChunkKeys) {
-  const requiredLakes = new Set();
-
-  for (const chunk of neededChunkKeys) {
-    const [cx, cz] = chunk.split(',').map(Number);
-    const ox = cx * CHUNK_SIZE;
-    const oz = cz * CHUNK_SIZE;
-    const margin = LAKE_MAX_RADIUS + 2;
-    const lxMin = Math.floor((ox - margin) / LAKE_CELL) - 1;
-    const lxMax = Math.floor((ox + CHUNK_SIZE + margin) / LAKE_CELL) + 1;
-    const lzMin = Math.floor((oz - margin) / LAKE_CELL) - 1;
-    const lzMax = Math.floor((oz + CHUNK_SIZE + margin) / LAKE_CELL) + 1;
-
-    for (let lz = lzMin; lz <= lzMax; lz++) {
-      for (let lx = lxMin; lx <= lxMax; lx++) {
-        const lake = getLakeDescriptor(lx, lz);
-        if (!lake) continue;
-        if (!chunkIntersectsLake(cx, cz, lake)) continue;
-        requiredLakes.add(lake.key);
-        createLakeSurface(lake);
-      }
-    }
-  }
-
-  for (const lakeKey of lakes.keys()) {
-    if (!requiredLakes.has(lakeKey)) disposeLakeSurface(lakeKey);
-  }
-}
-
-// ============================================================
-// WATER FOAM SYSTEM - Realistic flat foam on water surface
-// ============================================================
-const splashEffects = []; // Temporary splash effects that fade out
-const waterlineFoams = new Map(); // Persistent foam for floating objects (object -> foam data)
-
-// Create flat foam texture directly on water surface
-function createFoamMesh(x, z, baseRadius, lake, isSplash = false) {
-  const group = new THREE.Group();
-  
-  // Create flat foam patches using CircleGeometry lying flat on water
-  const patchCount = isSplash ? 12 : 8;
-  
-  for (let i = 0; i < patchCount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * baseRadius * 0.9;
-    const patchRadius = 0.03 + Math.random() * 0.08;
-    
-    // Flat circle on water surface
-    const geometry = new THREE.CircleGeometry(patchRadius, 8);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.5 + Math.random() * 0.5,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    
-    const patch = new THREE.Mesh(geometry, material);
-    patch.position.set(
-      Math.cos(angle) * dist,
-      0, // Exactly on water surface
-      Math.sin(angle) * dist
-    );
-    // Rotate to lie flat on water (XZ plane)
-    patch.rotation.x = -Math.PI / 2;
-    patch.rotation.z = Math.random() * Math.PI;
-    
-    group.add(patch);
-  }
-  
-  // Add larger irregular foam shapes
-  const clumpCount = isSplash ? 6 : 4;
-  for (let i = 0; i < clumpCount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * baseRadius * 0.7;
-    
-    // Irregular shape using distorted circle
-    const clumpRadius = 0.05 + Math.random() * 0.1;
-    const geometry = new THREE.CircleGeometry(clumpRadius, 6);
-    
-    // Distort vertices for organic look
-    const pos = geometry.attributes.position;
-    for (let j = 0; j < pos.count; j++) {
-      const px = pos.getX(j);
-      const py = pos.getY(j);
-      const distort = 0.7 + Math.random() * 0.6;
-      pos.setX(j, px * distort);
-      pos.setY(j, py * distort);
-    }
-    geometry.computeVertexNormals();
-    
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xf0f5ff, // Slightly blue-white
-      transparent: true,
-      opacity: 0.6 + Math.random() * 0.4,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    
-    const clump = new THREE.Mesh(geometry, material);
-    clump.position.set(
-      Math.cos(angle) * dist,
-      0,
-      Math.sin(angle) * dist
-    );
-    clump.rotation.x = -Math.PI / 2;
-    clump.rotation.z = Math.random() * Math.PI * 2;
-    
-    group.add(clump);
-  }
-  
-  // Position exactly at water level
-  group.position.set(x, lake.level + 0.005, z); // Tiny offset to prevent z-fighting
-  return group;
-}
-
-// Create splash effect with expanding foam ring
-function createSplash(x, z, radius, lake) {
-  const foam = createFoamMesh(x, z, radius, lake, true);
-  foam.userData = { 
-    born: performance.now(), 
-    duration: 2000, 
-    lake,
-    baseRadius: radius
-  };
-  scene.add(foam);
-  splashEffects.push(foam);
-}
-
-// Create waterline foam - foam ring around floating object
-function createWaterlineFoam(obj, objPos, objRadius, lake) {
-  const foam = createFoamMesh(objPos.x, objPos.z, objRadius * 0.4, lake, false);
-  foam.userData = { obj, lake, radius: objRadius };
-  scene.add(foam);
-  return foam;
-}
-
-// Track objects that just entered water (for splash)
-const waterEntryTracker = new Map(); // object id -> { wasInWater, entryTime }
-
-// Helper to dispose a foam group (with children)
-function disposeFoamGroup(foam) {
-  for (const child of foam.children) {
-    if (child.geometry) child.geometry.dispose();
-    if (child.material) child.material.dispose();
-  }
-  scene.remove(foam);
-}
-
-function updateFoamSystem(dt) {
-  const now = performance.now();
-  
-  // Update and remove expired splash effects
-  for (let i = splashEffects.length - 1; i >= 0; i--) {
-    const splash = splashEffects[i];
-    const age = now - splash.userData.born;
-    const progress = age / splash.userData.duration;
-    
-    if (progress >= 1) {
-      disposeFoamGroup(splash);
-      splashEffects.splice(i, 1);
-    } else {
-      // Fade out all children and expand the group
-      const opacity = 0.8 * (1 - progress);
-      for (const child of splash.children) {
-        if (child.material) {
-          child.material.opacity = opacity * (0.6 + Math.random() * 0.4);
-        }
-      }
-      splash.scale.setScalar(1 + progress * 2);
-    }
-  }
-  
-  // Process projectiles for splash and waterline foam
-  for (const p of projectiles) {
-    const t = p.body.translation();
-    const lake = getLakeAtWater(t.x, t.z);
-    const objId = p.mesh.uuid;
-    const isInWater = lake && t.y < lake.level;
-    const wasTracked = waterEntryTracker.get(objId);
-    
-    if (isInWater) {
-      if (!wasTracked || !wasTracked.wasInWater) {
-        // Just entered water - create splash
-        createSplash(t.x, t.z, 0.5, lake);
-        waterEntryTracker.set(objId, { wasInWater: true, entryTime: now, lake });
-      }
-      
-      // Check if floating (partially above water)
-      const objRadius = p.mesh.geometry?.boundingSphere?.radius || 0.25;
-      const isFloating = t.y + objRadius > lake.level && t.y - objRadius < lake.level;
-      
-      if (isFloating) {
-        // Update or create waterline foam
-        if (!waterlineFoams.has(objId)) {
-          const foam = createWaterlineFoam(p, t, objRadius, lake);
-          waterlineFoams.set(objId, { foam, obj: p, lake });
-        } else {
-          const foamData = waterlineFoams.get(objId);
-          foamData.foam.position.set(t.x, lake.level + 0.02, t.z);
-        }
-      } else {
-        // Fully submerged - remove waterline foam
-        if (waterlineFoams.has(objId)) {
-          const foamData = waterlineFoams.get(objId);
-          disposeFoamGroup(foamData.foam);
-          waterlineFoams.delete(objId);
-        }
-      }
-    } else {
-      // Not in water - clean up
-      if (waterlineFoams.has(objId)) {
-        const foamData = waterlineFoams.get(objId);
-        disposeFoamGroup(foamData.foam);
-        waterlineFoams.delete(objId);
-      }
-      waterEntryTracker.set(objId, { wasInWater: false, entryTime: null });
-    }
-  }
-  
-  // Process rigid bodies for splash and waterline foam
-  for (const rb of rigidBodies) {
-    if (rb.body.isFixed()) continue;
-    const t = rb.body.translation();
-    const lake = getLakeAtWater(t.x, t.z);
-    const objId = rb.mesh.uuid;
-    const isInWater = lake && t.y < lake.level;
-    const wasTracked = waterEntryTracker.get(objId);
-    
-    if (isInWater) {
-      if (!wasTracked || !wasTracked.wasInWater) {
-        // Just entered water - create splash
-        createSplash(t.x, t.z, 0.8, lake);
-        waterEntryTracker.set(objId, { wasInWater: true, entryTime: now, lake });
-      }
-      
-      // Check if floating (partially above water)
-      const objRadius = rb.mesh.geometry?.boundingSphere?.radius || 0.6;
-      const isFloating = t.y + objRadius > lake.level && t.y - objRadius < lake.level;
-      
-      if (isFloating) {
-        // Update or create waterline foam
-        if (!waterlineFoams.has(objId)) {
-          const foam = createWaterlineFoam(rb, t, objRadius, lake);
-          waterlineFoams.set(objId, { foam, obj: rb, lake });
-        } else {
-          const foamData = waterlineFoams.get(objId);
-          foamData.foam.position.set(t.x, lake.level + 0.02, t.z);
-        }
-      } else {
-        // Fully submerged - remove waterline foam
-        if (waterlineFoams.has(objId)) {
-          const foamData = waterlineFoams.get(objId);
-          disposeFoamGroup(foamData.foam);
-          waterlineFoams.delete(objId);
-        }
-      }
-    } else {
-      // Not in water - clean up
-      if (waterlineFoams.has(objId)) {
-        const foamData = waterlineFoams.get(objId);
-        disposeFoamGroup(foamData.foam);
-        waterlineFoams.delete(objId);
-      }
-      waterEntryTracker.set(objId, { wasInWater: false, entryTime: null });
-    }
-  }
-}
-
-// ============================================================
-// DANCING BALLS IN STARTING LAKE (from lake_scene files)
-// ============================================================
-const dancingBalls = [];
-const dancingBallsBodies = []; // Physics bodies for the balls
-let dancingBallsPlatform = null;
-let dancingBallsPlatformBody = null; // Physics body for platform
-let dancingBallsModel = null;
-let dancingBallsMixer = null;
-let startingLake = null;
-let iceColorNode = null;
-
-function createDancingBalls() {
-  // Find the lake at or near the starting position (0,0)
-  startingLake = getLakeAt(0, 0);
-  if (!startingLake) {
-    const lx = Math.floor(0 / LAKE_CELL + 0.5);
-    const lz = Math.floor(0 / LAKE_CELL + 0.5);
-    startingLake = getLakeDescriptor(lx, lz);
-  }
-  
-  if (!startingLake) {
-    console.log('No starting lake found for dancing balls');
-    return;
-  }
-  
-  console.log('Creating dancing balls in lake at:', startingLake.cx, startingLake.cz, 'level:', startingLake.level);
-  
-  // Load texture for the ice balls (from lake_scene files)
-  const textureLoader = new THREE.TextureLoader();
-  const iceDiffuse = textureLoader.load('water.jpg');
-  iceDiffuse.wrapS = THREE.RepeatWrapping;
-  iceDiffuse.wrapT = THREE.RepeatWrapping;
-  iceDiffuse.colorSpace = THREE.NoColorSpace;
-  
-  // Create the ice color node using triplanar texture (from lake_scene files)
-  iceColorNode = triplanarTexture(texture(iceDiffuse)).add(color(0x0066ff)).mul(0.8);
-  
-  // Create floating icosahedron balls (from lake_scene 15 & 17)
-  const iceGeometry = new THREE.IcosahedronGeometry(1, 3);
-  const iceMaterial = new THREE.MeshStandardNodeMaterial({ colorNode: iceColorNode });
-  
-  const count = 100;
-  const scale = 3.5;
-  const column = 10;
-  
-  const objectsGroup = new THREE.Group();
-  for (let i = 0; i < count; i++) {
-    const x = i % column;
-    const y = Math.floor(i / column);
-    const mesh = new THREE.Mesh(iceGeometry, iceMaterial);
-    mesh.position.set(x * scale, 0, y * scale);
-    mesh.rotation.set(Math.random(), Math.random(), Math.random());
-    mesh.castShadow = true;
-    objectsGroup.add(mesh);
-  }
-  
-  // Position the group centered over the lake
-  objectsGroup.position.set(
-    startingLake.cx - ((column - 1) * scale) * 0.5,
-    startingLake.level - 1,
-    startingLake.cz - ((count / column) * scale) * 0.5
-  );
-  scene.add(objectsGroup);
-  dancingBalls.push(...objectsGroup.children);
-  
-  // Create the cylindrical platform (from lake_scene 17)
-  const platformGeo = new THREE.CylinderGeometry(1.1, 1.1, 10);
-  const platformMat = new THREE.MeshStandardNodeMaterial({ colorNode: iceColorNode });
-  dancingBallsPlatform = new THREE.Mesh(platformGeo, platformMat);
-  dancingBallsPlatform.position.set(startingLake.cx, startingLake.level - 5, startingLake.cz);
-  dancingBallsPlatform.castShadow = true;
-  dancingBallsPlatform.receiveShadow = true;
-  scene.add(dancingBallsPlatform);
-  
-  // Load the dancing character model (Michelle from lake_scene 17)
-  const gltfLoader = new GLTFLoader();
-  gltfLoader.load(
-    'https://threejs.org/examples/models/gltf/Michelle.glb',
-    (gltf) => {
-      dancingBallsModel = gltf.scene;
-      dancingBallsMixer = new THREE.AnimationMixer(dancingBallsModel);
-      const action = dancingBallsMixer.clipAction(gltf.animations[0]);
-      action.play();
-      dancingBallsModel.position.set(startingLake.cx, startingLake.level, startingLake.cz);
-      dancingBallsModel.scale.set(1, 1, 1);
-      scene.add(dancingBallsModel);
-      console.log('Dancing model loaded');
-      
-      // Add physics to the dancer model after it loads
-      addDancerPhysics();
-    },
-    undefined,
-    () => {
-      console.log('Could not load dancing model');
-    }
-  );
-  
-  console.log('Created', dancingBalls.length, 'floating ice balls');
-}
-
-// Add physics to dancing balls after Rapier is loaded
-function addDancingBallsPhysics() {
-  if (!RAPIER || !physWorld || !startingLake) return;
-  
-  // Add physics to each ball
-  for (const ball of dancingBalls) {
-    const worldPos = new THREE.Vector3();
-    ball.getWorldPosition(worldPos);
-    
-    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-      .setTranslation(worldPos.x, worldPos.y, worldPos.z);
-    const body = physWorld.createRigidBody(bodyDesc);
-    
-    const colDesc = RAPIER.ColliderDesc.ball(1.0) // radius 1 for icosahedron
-      .setRestitution(0.6)
-      .setFriction(0.3)
-      .setDensity(0.5);
-    physWorld.createCollider(colDesc, body);
-    
-    dancingBallsBodies.push({ mesh: ball, body });
-  }
-  
-  // Add physics to platform (static)
-  if (dancingBallsPlatform) {
-    const platformPos = dancingBallsPlatform.position;
-    const bodyDesc = RAPIER.RigidBodyDesc.fixed()
-      .setTranslation(platformPos.x, platformPos.y, platformPos.z);
-    dancingBallsPlatformBody = physWorld.createRigidBody(bodyDesc);
-    
-    const colDesc = RAPIER.ColliderDesc.cylinder(5, 1.1) // half-height 5, radius 1.1
-      .setRestitution(0.3)
-      .setFriction(0.8);
-    physWorld.createCollider(colDesc, dancingBallsPlatformBody);
-    console.log('Added physics to dancing balls platform');
-  }
-  
-  console.log('Added physics to', dancingBallsBodies.length, 'dancing balls');
-}
-
-function animateDancingBalls(time, dt) {
-  // Animate the dancing model
-  if (dancingBallsMixer && dancingBallsModel) {
-    dancingBallsMixer.update(dt);
-  }
-  
-  // Animate the floating icosahedron balls (original animation from lake_scene)
-  for (const object of dancingBalls) {
-    object.position.y = Math.sin(time + object.id) * 0.3;
-    object.rotation.y += dt * 0.3;
-  }
-  
-  // Sync physics bodies with animated positions and apply water physics
-  for (let i = 0; i < dancingBallsBodies.length; i++) {
-    const { mesh, body } = dancingBallsBodies[i];
-    const worldPos = new THREE.Vector3();
-    mesh.getWorldPosition(worldPos);
-    
-    // Sync body position with animated mesh position
-    if (typeof body.setTranslation === 'function') {
-      body.setTranslation({ x: worldPos.x, y: worldPos.y, z: worldPos.z }, false);
-    }
-    
-    // Apply water physics if ball is in water
-    if (startingLake && worldPos.y < startingLake.level) {
-      const vel = body.linvel();
-      const waterDrag = 0.92;
-      const buoyancy = 2.0;
-      
-      body.setLinvel({
-        x: vel.x * waterDrag,
-        y: vel.y * waterDrag + buoyancy * dt,
-        z: vel.z * waterDrag
-      }, false);
-    }
-  }
-}
-
-// ============================================================
-// BIRDS
-// ============================================================
-const birds = [];
-for(let i=0;i<25;i++) {
-  const b = new THREE.Group();
-  // simple V-shape wings
-  const wL = jitter(new THREE.ConeGeometry(0.25, 0.6, 3), 0.05);
-  const wR = jitter(new THREE.ConeGeometry(0.25, 0.6, 3), 0.05);
-  const mL = new THREE.Mesh(wL, matBird);
-  const mR = new THREE.Mesh(wR, matBird);
-  mL.rotation.z = Math.PI/2;
-  mR.rotation.z = -Math.PI/2;
-  mL.position.x = -0.3;
-  mR.position.x = 0.3;
-  b.add(mL); b.add(mR);
-  const angle = Math.random()*Math.PI*2;
-  const rad = 40 + Math.random()*80;
-  b.position.set(Math.cos(angle)*rad, 20+Math.random()*30, Math.sin(angle)*rad);
-  b.userData = {
-    angle, rad,
-    speed: 0.003 + Math.random()*0.004,
-    height: 20+Math.random()*30,
-    flapSpeed: 3+Math.random()*3,
-    flapAmp: 0.4+Math.random()*0.3,
-    t: Math.random()*100
-  };
-  scene.add(b);
-  birds.push(b);
-}
-
-// ============================================================
-// CHUNK SYSTEM
-// ============================================================
-const chunks = new Map();
-const objects = new Map(); // decorations per chunk
-
-function chunkKey(cx,cz) { return `${cx},${cz}`; }
-
-function buildChunk(cx, cz) {
-  const key = chunkKey(cx,cz);
-  if(chunks.has(key)) return;
-
-  const ox = cx * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
-  const N = CHUNK_SEGS;
-  const verts = [], colors = [], indices = [];
-
-  // Build height grid
-  const heights = [];
-  for(let z=0;z<=N;z++) for(let x=0;x<=N;x++) {
-    const wx = ox + x*CELL, wz = oz + z*CELL;
-    const h = getLakeBottomHeight(wx, wz);
-    heights.push(h);
-  }
-
-  // Build geometry
-  for(let z=0;z<=N;z++) for(let x=0;x<=N;x++) {
-    const wx = ox + x*CELL, wz = oz + z*CELL;
-    const h = heights[z*(N+1)+x];
-    verts.push(x*CELL, h, z*CELL);
-    // color
-    const lake = isLake(wx, wz);
-    const path = !lake && isPath(wx, wz);
-    let r,g,b;
-    if(lake) { 
-      // Check if this is lake floor (flat bottom) or lake wall (sloped sides)
-      // Lake floor = height is close to the bottom of the lake
-      // Lake wall = height is significantly higher than the bottom
-      const lakeDesc = getLakeAt(wx, wz);
-      const isLakeFloor = lakeDesc && (h < lakeDesc.bottom + 2.0); // Within 2 units of lake bottom
-      
-      if (isLakeFloor) {
-        // Lake floor - deep dark blue like deep ocean water (0x0A1628 - Deep Navy)
-        r=0.039; g=0.086; b=0.157;
-      } else {
-        // Lake walls - sandy/earthy color like the rest of the terrain
-        r=0.6; g=0.45; b=0.3;
-      }
-    }
-    else if(path) { r=0.68;g=0.52;b=0.28; }
-    else if(h < 1.5) { r=0.6;g=0.45;b=0.3; } // sandy
-    else { // grass variation
-      const gv = 0.32 + fbm(wx*0.04,wz*0.04)*0.15;
-      r=0.2; g=gv+0.1; b=0.15;
-    }
-    colors.push(r,g,b);
-  }
-  for(let z=0;z<N;z++) for(let x=0;x<N;x++) {
-    const a=z*(N+1)+x, b=a+1, c=a+(N+1), d=c+1;
-    indices.push(a,c,b, b,c,d);
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts,3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-
-  const mat = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0 });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(ox, 0, oz);
-  mesh.receiveShadow = true;
-  mesh.castShadow = false;
-  scene.add(mesh);
-  chunks.set(key, mesh);
-
-  // --- Physics collider for this terrain chunk (static trimesh) ---
-  // IMPORTANT: Build vertices in CHUNK-LOCAL coordinates (same as the Three.js geometry),
-  // and place the collider using translation (ox, oz). This keeps physics aligned with visuals.
-  if(physWorld && RAPIER) {
-    const posAttr = geo.getAttribute('position');
-    const idxAttr = geo.index;
-
-    // Positions in chunk-local space
-    const verts = new Float32Array(posAttr.count * 3);
-    for(let i = 0; i < posAttr.count; i++) {
-      verts[i*3+0] = posAttr.getX(i);
-      verts[i*3+1] = posAttr.getY(i);
-      verts[i*3+2] = posAttr.getZ(i);
+      document.getElementById('ui').textContent = 'WebGPU לא זמין';
     }
 
-    // Indices
-    let indices;
-    if(idxAttr) {
-      indices = new Uint32Array(idxAttr.count);
-      for(let i = 0; i < idxAttr.count; i++) indices[i] = idxAttr.getX(i);
-    } else {
-      indices = new Uint32Array(posAttr.count);
-      for(let i = 0; i < posAttr.count; i++) indices[i] = i;
+    if (WebGPU.isAvailable() === false) {
+      showWebGPUError('הדפדפן או החומרה לא תומכים כרגע ב-WebGPU.');
+      const details = WebGPU.getErrorMessage?.();
+      if (details) document.body.appendChild(details);
+      throw new Error('WebGPU is not available');
     }
 
-    // Create collider directly (fixed body not needed)
-    // trimesh expects vertices as Float32Array and indices as Uint32Array
-    const colDesc = RAPIER.ColliderDesc.trimesh(verts, indices)
-      .setTranslation(ox, 0, oz)
-      .setRestitution(0.0)
-      .setFriction(0.9);
+    // ============================================================
+    // PLANET RADIUS & WORLD CONSTANTS
+    // ============================================================
+    const QUALITY_PRESET = (new URLSearchParams(location.search).get('quality') || 'performance').toLowerCase();
+    const HIGH_QUALITY = QUALITY_PRESET === 'high' || QUALITY_PRESET === 'ultra';
+    const ENABLE_SHADOWS = true;  // Always enable shadows for better visuals
+    const SHADOW_MAP_SIZE = HIGH_QUALITY ? 2048 : 1536;  // Larger shadow maps for sharper shadows
+    const PIXEL_RATIO_CAP = HIGH_QUALITY ? 1.5 : 1.0;
+    const LOOK_PRESET = (new URLSearchParams(location.search).get('look') || 'legacy').toLowerCase();
+    const LEGACY_LOOK = LOOK_PRESET !== 'flat';
+    const BUILD_TAG = 'webgpu-backdrop-water-box-v20';
+    const AMBIENT_INTENSITY = LEGACY_LOOK ? 0.66 : 0.68;
+    const SUN_INTENSITY = LEGACY_LOOK ? 2.9 : 2.35;
+    const HEMI_INTENSITY = LEGACY_LOOK ? 0.62 : 0.58;
+    const TONE_EXPOSURE = LEGACY_LOOK ? 1.18 : 1.12;  // Balanced summer exposure
 
-    const collider = physWorld.createCollider(colDesc);
-    terrainColliders.set(key, collider);
-  }
+    window.__buildInfo = {
+      build: BUILD_TAG,
+      quality: QUALITY_PRESET,
+      look: LOOK_PRESET
+    };
+    console.log('[Build]', window.__buildInfo);
+    document.title = `Lowpoly World WebGPU (${BUILD_TAG})`;
 
-  // Decorations - use world coords directly, no group offset
-  const group = new THREE.Group();
-  scene.add(group);
-  const rng = (s) => { let v=hash(cx*17+s,cz*31+s*7); return v; };
+    const PLANET_R = 800;          // effective "flat" radius before curvature kicks in
+    const CHUNK_SIZE = 64;
+    const CHUNK_SEGS = 16;
+    const RENDER_CHUNKS = HIGH_QUALITY ? 5 : 4; // chunks in each direction
+    const CELL = CHUNK_SIZE / CHUNK_SEGS;
 
-  const decCount = HIGH_QUALITY
-    ? 30 + Math.floor(rng(1) * 20)
-    : 18 + Math.floor(rng(1) * 10);
-  for(let i=0;i<decCount;i++) {
-    // World-space position of this decoration
-    const tx = ox + rng(i*7+2) * CHUNK_SIZE;
-    const tz = oz + rng(i*7+3) * CHUNK_SIZE;
-    if(isLake(tx,tz) || isPath(tx,tz)) continue;
-    const h = getHeight(tx, tz);   // exact height at this world pos
-    if(h < 1) continue;
-    const r4 = rng(i*7+4);
-    let obj;
-    // Seeded rng for this specific object - deterministic every rebuild
-    const objRng = (k) => hash(cx*113 + i*71 + k*37, cz*97 + i*53 + k*19);
-    if(r4 < 0.25) {
-      obj = makeTree(tx, h, tz, 0.7+rng(i*7+5)*0.8, objRng);
-    } else if(r4 < 0.45) {
-      obj = makeRock(tx, h, tz, objRng);
-    } else if(r4 < 0.65) {
-      obj = makeBush(tx, h, tz, objRng);
-    } else if(r4 < 0.9) {
-      obj = makeFlower(tx, h, tz, objRng);
-    }
-    if(obj) group.add(obj);
-  }
+    // ============================================================
+    // SCENE SETUP
+    // ============================================================
+    const SKY_BG_COLOR = new THREE.Color(0x5DADE2);  // Bright summer midday blue - clear sky
+    const SKY_FOG_COLOR = new THREE.Color(0xAED6F1);  // Light horizon blue for fog gradient
+    const SKY_FOG_NEAR = 200;
+    const SKY_FOG_FAR = 600;
+    const UNDERWATER_BG_COLOR = new THREE.Color(0x5d98bc);
+    const UNDERWATER_FOG_COLOR = new THREE.Color(0x4a7ea6);
+    const UNDERWATER_FOG_NEAR = 0.8;
+    const UNDERWATER_FOG_FAR = 46;
 
-  // No position offset - objects are in world space already
-  objects.set(key, group);
-
-  // Create physics colliders for decorations in this chunk
-  if(physWorld && RAPIER) addDecorationCollidersFromGroup(group);
-}
-
-function removeChunk(cx,cz) {
-  const key = chunkKey(cx,cz);
-  const mesh = chunks.get(key);
-  if(mesh) { scene.remove(mesh); mesh.geometry.dispose(); chunks.delete(key); }
-  const grp = objects.get(key);
-  if(grp) { scene.remove(grp); objects.delete(key); }
-
-  // Remove physics collider for this chunk
-  if(physWorld && terrainColliders.has(key)) {
-    physWorld.removeCollider(terrainColliders.get(key), true);
-    terrainColliders.delete(key);
-  }
-
-  // Remove & rebuild decoration colliders lazily (next frame) to avoid stutter in the middle of movement.
-  if(physWorld && RAPIER) decorationsDirty = true;
-}
-
-function updateChunks(px, pz) {
-  // Use floor so we don't thrash chunk rebuilds around boundaries.
-  // Rounding can cause rapid add/remove when hovering near edges -> stutter.
-  const curCX = Math.floor(px / CHUNK_SIZE);
-  const curCZ = Math.floor(pz / CHUNK_SIZE);
-  const needed = new Set();
-  const R = RENDER_CHUNKS;
-  for(let dz=-R;dz<=R;dz++) for(let dx=-R;dx<=R;dx++) {
-    if(dx*dx+dz*dz > R*R+1) continue;
-    const cx=curCX+dx, cz=curCZ+dz;
-    needed.add(chunkKey(cx,cz));
-    buildChunk(cx,cz);
-  }
-  for(const [key] of chunks) {
-    if(!needed.has(key)) removeChunk(...key.split(',').map(Number));
-  }
-  syncVisibleLakes(needed);
-}
-
-// ============================================================
-// INPUT & POINTER LOCK
-// ============================================================
-const keys = {};
-let yaw = 0, pitch = 0;
-let started = false;
-let flyMode = false;
-let isLocked = false;
-
-renderer.domElement.style.cursor = 'crosshair';
-renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
-
-// Click canvas = lock pointer (true FPS)
-renderer.domElement.addEventListener('click', () => {
-  if(!started) return;
-  renderer.domElement.requestPointerLock();
-});
-
-document.getElementById('click-to-start').addEventListener('click', () => {
-  started = true;
-  document.getElementById('click-to-start').style.display = 'none';
-  renderer.domElement.requestPointerLock();
-});
-
-document.addEventListener('pointerlockchange', () => {
-  isLocked = document.pointerLockElement === renderer.domElement;
-});
-document.addEventListener('pointerlockerror', () => {
-  console.warn('Pointer lock failed');
-});
-
-document.addEventListener('mousemove', e => {
-  if(!isLocked) return;
-  yaw   -= e.movementX * 0.002;
-  pitch -= e.movementY * 0.002;
-  pitch  = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch));
-});
-
-document.addEventListener('keydown', e => {
-  keys[e.code] = true;
-  if(e.code === 'KeyF') { flyMode = !flyMode; }
-  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
-});
-document.addEventListener('keyup', e => { keys[e.code] = false; });
-
-window.addEventListener('resize', () => {
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
-
-// ============================================================
-// HELPERS
-// ============================================================
-function getTerrainY(x, z) {
-  return getLakeBottomHeight(x, z);
-}
-function getAvgHeight(x, z, radius) {
-  return Math.min(
-    getHeight(x,z), getHeight(x+radius,z), getHeight(x-radius,z),
-    getHeight(x,z+radius), getHeight(x,z-radius)
-  );
-}
-
-// ============================================================
-// PHYSICS CONSTANTS
-// ============================================================
-const SPEED       = 9;
-const RUN_SPEED   = 20;
-const FLY_SPEED   = 16;
-const JUMP_VEL    = 8;
-const GRAVITY_ACC = -22;
-const EYE_HEIGHT  = 1.75;
-
-// Player physics capsule (Rapier)
-const PLAYER_RADIUS = 0.35;
-const PLAYER_HALF_HEIGHT = 0.55; // half of cylinder part (excluding hemispheres)
-const PLAYER_MASS = 70;
-
-let velY      = 0; // legacy fallback when Rapier not ready
-let isGrounded = false;
-const playerPos = new THREE.Vector3(0, 10, 0);
-
-// Rapier player body/collider
-let playerBody = null;
-let playerCollider = null;
-let lastJumpTime = 0;
-
-// Robust terrain sampler - samples a small grid and returns max
-// to handle slopes: we want the HIGHEST point under the player's feet
-function sampleGround(x, z) {
-  const r = 0.3; // player foot radius
-  return Math.max(
-    getTerrainY(x,     z    ),
-    getTerrainY(x + r, z    ),
-    getTerrainY(x - r, z    ),
-    getTerrainY(x,     z + r),
-    getTerrainY(x,     z - r)
-  );
-}
-
-let underwaterActive = false;
-function updateWaterViewState() {
-  const lake = getLakeAtWater(playerPos.x, playerPos.z);
-  const isUnderwater = !!lake && playerPos.y < lake.level - 0.03;
-  if (isUnderwater === underwaterActive) return;
-
-  underwaterActive = isUnderwater;
-  if (underwaterActive) {
-    scene.background = UNDERWATER_BG_COLOR.clone();
-    scene.fog.color.copy(UNDERWATER_FOG_COLOR);
-    scene.fog.near = UNDERWATER_FOG_NEAR;
-    scene.fog.far = UNDERWATER_FOG_FAR;
-    renderer.toneMappingExposure = TONE_EXPOSURE * 0.9;
-    if (underwaterOverlay) underwaterOverlay.style.opacity = '1';
-  } else {
+    const scene = new THREE.Scene();
     scene.background = SKY_BG_COLOR.clone();
-    scene.fog.color.copy(SKY_FOG_COLOR);
-    scene.fog.near = SKY_FOG_NEAR;
-    scene.fog.far = SKY_FOG_FAR;
+    scene.fog = new THREE.Fog(SKY_FOG_COLOR.clone(), SKY_FOG_NEAR, SKY_FOG_FAR);
+
+    const renderer = new THREE.WebGPURenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, PIXEL_RATIO_CAP));
+    renderer.shadowMap.enabled = ENABLE_SHADOWS;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = TONE_EXPOSURE;
-    if (underwaterOverlay) underwaterOverlay.style.opacity = '0';
-  }
-}
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(renderer.domElement);
 
-// ============================================================
-// ANIMATION LOOP
-// ============================================================
-let last = performance.now();
-let renderFailureShown = false;
-let renderInFlight = false;
+    const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 700);
+    camera.position.set(0, 5, 0);
+    const underwaterOverlay = document.getElementById('underwater-overlay');
 
-function reportRenderFailure(err) {
-  if (renderFailureShown) return;
-  showWebGPUError('שגיאת רינדור WebGPU. בדוק תמיכה בדפדפן/דרייבר.');
-  console.error('WebGPU render failed:', err);
-  renderFailureShown = true;
-}
+    // ============================================================
+    // LIGHTING  (bright summer noon sun)
+    // ============================================================
+    const ambient = new THREE.AmbientLight(0xfff8e7, 0.5);  // Warm ambient for summer feel
+    scene.add(ambient);
 
-function renderFrame() {
-  if (typeof renderer.renderAsync === 'function') {
-    if (renderInFlight) return;
-    renderInFlight = true;
-    renderer.renderAsync(scene, camera)
-      .catch(reportRenderFailure)
-      .finally(() => { renderInFlight = false; });
-    return;
-  }
-  if (typeof renderer.render === 'function') {
-    try {
-      renderer.render(scene, camera);
-    } catch (err) {
-      reportRenderFailure(err);
+    const sun = new THREE.DirectionalLight(0xFFFAF0, 2.8);  // Balanced warm white sun
+    sun.position.set(200, 250, 150);  // Fixed world position - never moves
+    sun.castShadow = ENABLE_SHADOWS;
+    if (ENABLE_SHADOWS) {
+      sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+      sun.shadow.camera.near = 1;
+      sun.shadow.camera.far = 800;
+      sun.shadow.camera.left = sun.shadow.camera.bottom = -400;
+      sun.shadow.camera.right = sun.shadow.camera.top = 400;
+      sun.shadow.bias = -0.0002;
+      sun.shadow.normalBias = 0.02;
     }
-    return;
-  }
-  reportRenderFailure(new TypeError('Renderer does not expose render/renderAsync'));
-}
+    scene.add(sun);
 
-function animate() {
-  requestAnimationFrame(animate);
-  const now = performance.now();
-  const dt  = Math.min((now - last) / 1000, 0.05);
-  last = now;
+    // Hemisphere fill - sky blue from above, warm ground bounce
+    const hemi = new THREE.HemisphereLight(0x5DADE2, 0x8B7355, 0.6);
+    scene.add(hemi);
 
-  if(started) {
-    const spd  = keys['ShiftLeft']||keys['ShiftRight'] ? RUN_SPEED : SPEED;
-    const fwdH = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const rgtH = new THREE.Vector3( Math.cos(yaw), 0, -Math.sin(yaw));
+    // Extra sky fill to keep dark objects readable without changing their material.
+    const skyFill = new THREE.HemisphereLight(0xAED6F1, 0x6f8a72, 0.28);
+    scene.add(skyFill);
 
-    if(flyMode) {
-      // ---- FLY MODE ---- (no collisions)
-      const fwd3 = new THREE.Vector3(
-        -Math.sin(yaw)*Math.cos(pitch),
-         Math.sin(pitch),
-        -Math.cos(yaw)*Math.cos(pitch)
+    // Sun disc in sky - larger and more radiant (fixed position)
+    const sunGeo = new THREE.SphereGeometry(15, 16, 16);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFACD });
+    const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+    sunMesh.position.set(400, 500, 300);  // Fixed position in sky
+    scene.add(sunMesh);
+
+    // Sun glow halo effect
+    const glowGeo = new THREE.SphereGeometry(25, 16, 16);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xFFF8DC,
+      transparent: true,
+      opacity: 0.25
+    });
+    const sunGlow = new THREE.Mesh(glowGeo, glowMat);
+    sunGlow.position.copy(sunMesh.position);
+    scene.add(sunGlow);
+
+    // ============================================================
+    // NOISE  (simple deterministic)
+    // ============================================================
+    function hash(x, y) {
+      let n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+      return n - Math.floor(n);
+    }
+    function smoothNoise(x, y) {
+      const ix = Math.floor(x), iy = Math.floor(y);
+      const fx = x - ix, fy = y - iy;
+      const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+      const a = hash(ix, iy), b = hash(ix + 1, iy);
+      const c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+      return a + (b - a) * ux + (c - a) * uy + (d - a + a - b - c + b + c - d) * ux * uy - (c - a) * uy;
+    }
+    function fbm(x, y, oct = 5) {
+      let v = 0, amp = 1, freq = 1, max = 0;
+      for (let i = 0; i < oct; i++) { v += smoothNoise(x * freq, y * freq) * amp; max += amp; amp *= 0.5; freq *= 2.1; }
+      return v / max;
+    }
+    function getHeight(wx, wz) {
+      const scale = 0.008;
+      let h = fbm(wx * scale, wz * scale, 6);
+      h = Math.pow(h, 1.4) * 28;
+      // rolling hills
+      h += fbm(wx * 0.003, wz * 0.003, 3) * 8;
+      // flat valleys
+      const valley = smoothNoise(wx * 0.004, wz * 0.004);
+      if (valley < 0.35) h *= valley / 0.35 * 0.3;
+      return h;
+    }
+
+    // Lake detection
+    function isLake(wx, wz) {
+      return getLakeAtWater(wx, wz) !== null;
+    }
+
+    // Path detection
+    function isPath(wx, wz) {
+      // winding dirt paths using low-freq noise
+      const pathNoise = smoothNoise(wx * 0.02, wz * 0.02 + 100);
+      const offset = (pathNoise - 0.5) * 20;
+      // main path: diagonal
+      const dist1 = Math.abs((wx + wz * 0.7 + offset) % 180 - 90);
+      const dist2 = Math.abs((wx * 0.6 - wz + offset * 0.8) % 200 - 100);
+      return dist1 < 3.5 || dist2 < 2.8;
+    }
+
+    // ============================================================
+    // MATERIALS
+    // ============================================================
+    const matGrass = new THREE.MeshPhongMaterial({ color: 0x5aaf3c, flatShading: true, shininess: 0 });
+    const matDarkGrass = new THREE.MeshPhongMaterial({ color: 0x3d8a25, flatShading: true, shininess: 0 });
+    const matDirt = new THREE.MeshPhongMaterial({ color: 0xa0784a, flatShading: true, shininess: 0 });
+    const matPath = new THREE.MeshPhongMaterial({ color: 0xb8945a, flatShading: true, shininess: 0 });
+    const matRock = new THREE.MeshPhongMaterial({ color: 0x8a8a7a, flatShading: true, shininess: 5 });
+    const matRockDark = new THREE.MeshPhongMaterial({ color: 0x6a6a5a, flatShading: true, shininess: 5 });
+    const matTreeTrunk = new THREE.MeshPhongMaterial({ color: 0x7a5230, flatShading: true, shininess: 0 });
+    const matLeaf1 = new THREE.MeshPhongMaterial({ color: 0x3daa2a, flatShading: true, shininess: 0 });
+    const matLeaf2 = new THREE.MeshPhongMaterial({ color: 0x4dc535, flatShading: true, shininess: 0 });
+    const matLeaf3 = new THREE.MeshPhongMaterial({ color: 0x2d8a1a, flatShading: true, shininess: 0 });
+    const matFlower1 = new THREE.MeshPhongMaterial({ color: 0xf7c94b, flatShading: true, shininess: 10 });
+    const matFlower2 = new THREE.MeshPhongMaterial({ color: 0xe84393, flatShading: true, shininess: 10 });
+    const matFlower3 = new THREE.MeshPhongMaterial({ color: 0xff6b35, flatShading: true, shininess: 10 });
+    const matBush = new THREE.MeshPhongMaterial({ color: 0x2e7d32, flatShading: true, shininess: 0 });
+    const matBird = new THREE.MeshPhongMaterial({ color: 0x333333, flatShading: true, shininess: 0 });
+
+    // Water material - exact implementation from lake_scene (15).html
+    function makeBackdropWaterMaterial() {
+      const t = time.mul(0.8);
+      const floorUV = positionWorld.xzy;
+      const waterLayer0 = mx_worley_noise_float(floorUV.mul(4).add(t));
+      const waterLayer1 = mx_worley_noise_float(floorUV.mul(2).add(t));
+      const waterIntensity = waterLayer0.mul(waterLayer1);
+      const waterColor = waterIntensity.mul(1.4).mix(color(0x0487e2), color(0x74ccf4));
+      const depth = linearDepth();
+      // Compute depth of the water and invert it (oneMinus) as in the original example
+      const depthWater = viewportLinearDepth.sub(depth).oneMinus();
+      const depthEffect = depthWater.remapClamp(-0.002, 0.04);
+      const refractionUV = screenUV.add(vec2(0, waterIntensity.mul(0.1)));
+      const depthTestForRefraction = linearDepth(viewportDepthTexture(refractionUV)).sub(depth);
+      const depthRefraction = depthTestForRefraction.remapClamp(0, 0.1);
+      const finalUV = depthTestForRefraction.lessThan(0).select(screenUV, refractionUV);
+      const viewportTexture = viewportSharedTexture(finalUV);
+      const waterMaterial = new THREE.MeshBasicNodeMaterial();
+      // Assign the node-based color and backdrop nodes from the original example
+      waterMaterial.colorNode = waterColor;
+      waterMaterial.backdropNode = depthEffect.mix(
+        viewportSharedTexture(),
+        viewportTexture.mul(depthRefraction.mix(1, waterColor))
       );
-      const mv = new THREE.Vector3();
-      if(keys['KeyW']||keys['ArrowUp'])    mv.add(fwd3);
-      if(keys['KeyS']||keys['ArrowDown'])  mv.sub(fwd3);
-      if(keys['KeyA']||keys['ArrowLeft'])  mv.sub(rgtH);
-      if(keys['KeyD']||keys['ArrowRight']) mv.add(rgtH);
-      if(keys['Space']||keys['KeyE'])      mv.y += 1;
-      if(keys['KeyQ'])                     mv.y -= 1;
-      if(mv.lengthSq() > 0) mv.normalize().multiplyScalar(FLY_SPEED * dt);
-      playerPos.add(mv);
+      waterMaterial.backdropAlphaNode = depthRefraction.oneMinus();
+      // Important: prevent the water mesh from writing to the depth buffer
+      waterMaterial.depthWrite = false;
+      waterMaterial.transparent = true;
+      // Render both sides of the water surface
+      waterMaterial.side = THREE.DoubleSide;
+      return waterMaterial;
+    }
 
-      // Keep Rapier body aligned if it exists
-      if(playerBody) {
-        const bodyY = playerPos.y - (EYE_HEIGHT - PLAYER_RADIUS);
-        if(typeof playerBody.setTranslation === 'function') {
-          playerBody.setTranslation({ x: playerPos.x, y: bodyY, z: playerPos.z }, true);
-        }
-        if(typeof playerBody.setLinvel === 'function') playerBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    const sharedBackdropWaterMaterial = makeBackdropWaterMaterial();
+    // ============================================================
+    // GEOMETRY HELPERS
+    // ============================================================
+    function jitter(geo, amount = 0.3) {
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        pos.setXYZ(i,
+          pos.getX(i) + (Math.random() - 0.5) * amount,
+          pos.getY(i) + (Math.random() - 0.5) * amount * 0.5,
+          pos.getZ(i) + (Math.random() - 0.5) * amount
+        );
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    function makeTree(x, y, z, scale = 1, rng = Math.random) {
+      const g = new THREE.Group();
+      const h = (1.8 + rng(0) * 1.2) * scale;
+      const tg = new THREE.CylinderGeometry(0.1 * scale, 0.18 * scale, h, 5);
+      const tm = new THREE.Mesh(tg, matTreeTrunk);
+      tm.position.set(0, h / 2, 0);
+      tm.castShadow = true;
+      g.add(tm);
+      const leafMats = [matLeaf1, matLeaf2, matLeaf3];
+      const layers = 3 + Math.floor(rng(1) * 2);
+      for (let i = 0; i < layers; i++) {
+        const r = (1.3 - i * 0.22) * scale;
+        const lh = (1.0 + rng(i * 3 + 2) * 0.3) * scale;
+        const lg = new THREE.ConeGeometry(r, lh, 6);
+        const lm = new THREE.Mesh(lg, leafMats[i % 3]);
+        lm.position.set(0, h + i * (lh * 0.52), 0);
+        lm.rotation.y = (rng(i * 3 + 3) + i * 0.5) * Math.PI;
+        lm.castShadow = true;
+        g.add(lm);
+      }
+      g.position.set(x, y, z);
+      return g;
+    }
+
+    function toFlat(geo) {
+      // Only call toNonIndexed if geometry IS indexed (has an index buffer)
+      const flat = geo.index ? geo.toNonIndexed() : geo;
+      flat.computeVertexNormals();
+      return flat;
+    }
+
+    function makeRockGeo(s) {
+      return toFlat(new THREE.IcosahedronGeometry(s, 1));
+    }
+
+    function makeRock(x, y, z, rng) {
+      const g = new THREE.Group();
+      const r0 = rng(0), r1 = rng(1), r2 = rng(2), r3 = rng(3), r4 = rng(4),
+        r5 = rng(5), r6 = rng(6), r7 = rng(7), r8 = rng(8), r9 = rng(9);
+
+      const s = 0.5 + r0 * 1.0;
+      const scaleX = 0.9 + r3 * 0.5;
+      const scaleY = 0.38 + r2 * 0.18;   // how flat the rock is (0.38-0.56)
+      const scaleZ = 0.85 + r4 * 0.5;
+
+      // The rock mesh is an IcosahedronGeometry centered at origin.
+      // Its top is at +s*scaleY, its bottom is at -s*scaleY (in local space).
+      // We want the BOTTOM to sit at terrain height, so we lift the mesh by s*scaleY.
+      // Then we sink it INTO the ground by 30% of its height (heavier = bigger s = more sink).
+      const halfH = s * scaleY;          // half-height of rock after Y scale
+      const sinkFrac = 0.25 + r0 * 0.20;  // 25%-45% of halfH sinks below ground
+      const liftY = halfH - halfH * sinkFrac;  // net lift = bottom + partial sink
+
+      const col = r1 < 0.5 ? 0x8a8a7a : 0x6e7060;
+      const mat = new THREE.MeshPhongMaterial({ color: col, flatShading: true, shininess: 3 });
+      const rm = new THREE.Mesh(makeRockGeo(s), mat);
+      rm.scale.set(scaleX, scaleY, scaleZ);
+      rm.rotation.y = r5 * Math.PI * 2;
+      rm.position.y = liftY;    // sit on ground, partially embedded
+      rm.castShadow = true;
+      rm.receiveShadow = true;
+      g.add(rm);
+
+      // Companion rock - same logic, positioned relative to group
+      if (r6 < 0.55) {
+        const s2 = s * (0.28 + r7 * 0.32);
+        const scaleY2 = 0.4 + r8 * 0.18;
+        const halfH2 = s2 * scaleY2;
+        const liftY2 = halfH2 * 0.70;   // 30% sunk
+        const offX = (r8 - 0.5) * s * 1.4;
+        const offZ = (r9 - 0.5) * s * 1.4;
+        // Get terrain height at companion position relative to group origin
+        const groundOff = getHeight(x + offX, z + offZ) - getHeight(x, z);
+        const mat2 = new THREE.MeshPhongMaterial({ color: 0x72726a, flatShading: true, shininess: 3 });
+        const r2m = new THREE.Mesh(makeRockGeo(s2), mat2);
+        r2m.scale.set(1.0 + r7 * 0.3, scaleY2, 1.0 + r7 * 0.3);
+        r2m.position.set(offX, groundOff + liftY2, offZ);
+        r2m.rotation.y = r9 * Math.PI * 2;
+        r2m.castShadow = true;
+        g.add(r2m);
       }
 
-    } else {
-      // ---- WALK MODE ---- (Rapier-driven)
-      if(physWorld && playerBody) {
-        const mv = new THREE.Vector3();
-        if(keys['KeyW']||keys['ArrowUp'])    mv.add(fwdH);
-        if(keys['KeyS']||keys['ArrowDown'])  mv.sub(fwdH);
-        if(keys['KeyA']||keys['ArrowLeft'])  mv.sub(rgtH);
-        if(keys['KeyD']||keys['ArrowRight']) mv.add(rgtH);
-        if(mv.lengthSq() > 0) mv.normalize();
+      // Group origin = exact terrain height at rock center
+      const groundY = getAvgHeight(x, z, s * 0.6);
+      g.position.set(x, groundY, z);
+      return g;
+    }
 
-        // Check if player is in water
-        const playerLake = getLakeAtWater(playerPos.x, playerPos.z);
-        const inWater = playerLake && playerPos.y < playerLake.level;
-        const waterSpeedMult = inWater ? 0.5 : 1.0;  // Slower in water
-        const actualSpd = spd * waterSpeedMult;
+    function makeBush(x, y, z, rng) {
+      const g = new THREE.Group();
+      const s = 0.5 + rng(0) * 0.7;
+      const cols = [0x2e7d32, 0x388e3c, 0x43a047, 0x1b5e20];
+      const count = 2 + Math.floor(rng(1) * 3);
+      for (let i = 0; i < count; i++) {
+        const r = s * (0.45 + rng(i * 4 + 2) * 0.45);
+        const sg = new THREE.IcosahedronGeometry(r, 1);
+        const col = cols[Math.floor(rng(i * 4 + 3) * cols.length)];
+        const sm = new THREE.Mesh(sg, new THREE.MeshPhongMaterial({ color: col, flatShading: true, shininess: 0 }));
+        // Y: embed half-radius into ground so bushes sit on terrain
+        sm.position.set((rng(i * 4 + 4) - 0.5) * s * 1.2, r * 0.45, (rng(i * 4 + 5) - 0.5) * s * 1.2);
+        sm.scale.y = 0.65 + rng(i * 4 + 6) * 0.25;
+        sm.castShadow = true;
+        g.add(sm);
+      }
+      g.position.set(x, y, z);
+      return g;
+    }
 
-        // Ground check via raycast
-        const origin = playerBody.translation();
-        const ray = new RAPIER.Ray({ x: origin.x, y: origin.y, z: origin.z }, { x: 0, y: -1, z: 0 });
-        const maxToi = PLAYER_HALF_HEIGHT + PLAYER_RADIUS + 0.12;
-        const hit = physWorld.castRay(ray, maxToi, true);
-        isGrounded = !!hit;
+    function makeFlower(x, y, z, rng = Math.random) {
+      const g = new THREE.Group();
+      const flowerCols = [0xf7c94b, 0xe84393, 0xff6b35, 0xff4488, 0xffcc00, 0xff8833];
+      const col = flowerCols[Math.floor(Math.random() * flowerCols.length)];
+      const mat = new THREE.MeshPhongMaterial({ color: col, flatShading: true, shininess: 5 });
+      const stemMat = new THREE.MeshPhongMaterial({ color: 0x3a8a2a, flatShading: true, shininess: 0 });
 
-        const cur = playerBody.linvel();
-        const desired = { x: mv.x * actualSpd, y: cur.y, z: mv.z * actualSpd };
+      const stemH = 0.25 + Math.random() * 0.2;
+      // Stem
+      const stemG = new THREE.CylinderGeometry(0.018, 0.022, stemH, 4);
+      const stemM = new THREE.Mesh(stemG, stemMat);
+      stemM.position.y = stemH * 0.5;
+      g.add(stemM);
 
-        // Jump (weaker in water)
-        if(keys['Space'] && isGrounded && (now - lastJumpTime) > 250) {
-          desired.y = inWater ? JUMP_VEL * 0.5 : JUMP_VEL;
-          lastJumpTime = now;
+      // Flower head: use OctahedronGeometry - 8 faces, naturally cute & lowpoly
+      const headSize = 0.12 + Math.random() * 0.09;
+      const headGeo = new THREE.OctahedronGeometry(headSize, 0);
+      headGeo.computeVertexNormals();
+      const headM = new THREE.Mesh(headGeo, mat);
+      headM.position.y = stemH + headSize * 0.7;
+      headM.rotation.y = Math.random() * Math.PI;
+      headM.scale.y = 0.75;
+      g.add(headM);
+
+      g.position.set(x, y, z);
+      return g;
+    }
+
+    // ============================================================
+    // LAKE MESH
+    // ============================================================
+    const LAKE_CELL = 120;
+    const LAKE_MAX_RADIUS = 40;
+    const LAKE_EDGE_SOFTNESS = 0.16;
+    const LAKE_WATER_FOOTPRINT_SCALE = 1.05;
+    const LAKE_MIN_VISIBLE_DEPTH = 0.55;
+    const lakes = new Map(); // lakeKey -> { surface, volume }
+    const lakeDescriptors = new Map(); // lakeKey -> descriptor | null
+
+    function smoothstep01(t) {
+      const x = Math.min(1, Math.max(0, t));
+      return x * x * (3 - 2 * x);
+    }
+
+    function lakeDepthAtPoint(lake, wx, wz) {
+      const dx = wx - lake.cx;
+      const dz = wz - lake.cz;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist >= lake.r) return 0;
+      const edgeStart = lake.r * (1 - LAKE_EDGE_SOFTNESS);
+      const edgeT = (dist - edgeStart) / Math.max(0.0001, lake.r - edgeStart);
+      const fade = 1 - smoothstep01(edgeT);
+      return lake.depth * fade;
+    }
+
+    function getLakeBottomHeightForDescriptor(lake, wx, wz) {
+      return getHeight(wx, wz) - lakeDepthAtPoint(lake, wx, wz);
+    }
+
+    function getLakeWaterRadius(lake) {
+      return lake.r * LAKE_WATER_FOOTPRINT_SCALE;
+    }
+
+    function isPointInsideLakeWater(lake, wx, wz) {
+      if (!lake) return false;
+      const waterRadius = getLakeWaterRadius(lake);
+      const dx = Math.abs(wx - lake.cx);
+      const dz = Math.abs(wz - lake.cz);
+      return dx <= waterRadius && dz <= waterRadius;
+    }
+
+    function computeLakeProfile(lake) {
+      const rimSamples = HIGH_QUALITY ? 72 : 56;
+      const rimRadius = lake.r + CELL * 0.8;
+      let spillHeight = Infinity;
+      for (let i = 0; i < rimSamples; i++) {
+        const a = (i / rimSamples) * Math.PI * 2;
+        const wx = lake.cx + Math.cos(a) * rimRadius;
+        const wz = lake.cz + Math.sin(a) * rimRadius;
+        spillHeight = Math.min(spillHeight, getHeight(wx, wz));
+      }
+
+      let floorMin = Infinity;
+      let floorSum = 0;
+      let floorCount = 0;
+      let groundSum = 0;  // Also track original ground height (before lake depth)
+      const radialSteps = 6;
+      for (let rStep = 0; rStep <= radialSteps; rStep++) {
+        const rr = (rStep / radialSteps) * (lake.r * 0.95);
+        const ringCount = Math.max(10, Math.round((HIGH_QUALITY ? 54 : 40) * (0.35 + 0.65 * (rr / lake.r))));
+        for (let i = 0; i < ringCount; i++) {
+          const a = (i / ringCount) * Math.PI * 2;
+          const wx = lake.cx + Math.cos(a) * rr;
+          const wz = lake.cz + Math.sin(a) * rr;
+          const h = getLakeBottomHeightForDescriptor(lake, wx, wz);
+          const groundH = getHeight(wx, wz);  // Original ground height
+          floorMin = Math.min(floorMin, h);
+          floorSum += h;
+          groundSum += groundH;
+          floorCount++;
         }
-        
-        // Swim up in water
-        if(inWater && keys['Space']) {
-          desired.y = Math.max(desired.y, 4);
+      }
+
+      const floorMean = floorSum / Math.max(1, floorCount);
+      const groundMean = groundSum / Math.max(1, floorCount);  // Average ground height in lake area
+
+      // CRITICAL FIX: Water level must be BELOW the average ground level
+      // This prevents water from floating above the terrain
+      const maxAllowed = Math.min(spillHeight - 0.05, groundMean - 0.5);
+      const targetDepth = THREE.MathUtils.clamp((spillHeight - floorMin) * 0.82, 0.65, lake.depth + 0.35);
+
+      let level = floorMin + targetDepth;
+      level = Math.max(level, floorMean + 0.18);
+      level = Math.max(level, floorMin + 0.35);
+      level = Math.min(level, maxAllowed);
+
+      if (!Number.isFinite(level)) level = getHeight(lake.cx, lake.cz) - 0.2;
+
+      let bottom = Math.min(floorMin, level - 0.95);
+      if (!Number.isFinite(bottom)) bottom = level - 1.1;
+      bottom = Math.min(bottom, level - 0.3);
+
+      return { level, bottom, floorMin, floorMean, spillHeight };
+    }
+
+    function getLakeDescriptor(lx, lz) {
+      const key = `${lx},${lz}`;
+      if (lakeDescriptors.has(key)) return lakeDescriptors.get(key);
+
+      const seed = hash(lx * 17.3, lz * 31.7);
+      if (seed >= 0.18) {
+        lakeDescriptors.set(key, null);
+        return null;
+      }
+
+      const cx = lx * LAKE_CELL;
+      const cz = lz * LAKE_CELL;
+      const r = 15 + seed * 25;
+      const depth = (2.3 + seed * 1.4) * 3;  // 3x deeper lakes
+      const descriptor = { key, lx, lz, cx, cz, r, depth, level: 0, bottom: 0 };
+      const profile = computeLakeProfile(descriptor);
+
+      if (profile.spillHeight <= profile.floorMin + 1.5) {
+        lakeDescriptors.set(key, null);
+        return null;
+      }
+
+      descriptor.level = profile.level;
+      descriptor.bottom = profile.bottom;
+      lakeDescriptors.set(key, descriptor);
+      return descriptor;
+    }
+
+    function getLakeAt(wx, wz) {
+      const lx = Math.floor(wx / LAKE_CELL + 0.5);
+      const lz = Math.floor(wz / LAKE_CELL + 0.5);
+      const descriptor = getLakeDescriptor(lx, lz);
+      if (!descriptor) return null;
+      const dx = wx - descriptor.cx;
+      const dz = wz - descriptor.cz;
+      if (dx * dx + dz * dz >= descriptor.r * descriptor.r) return null;
+      return descriptor;
+    }
+
+    function getLakeAtWater(wx, wz) {
+      const lake = getLakeAt(wx, wz);
+      if (!lake) return null;
+      return isPointInsideLakeWater(lake, wx, wz) ? lake : null;
+    }
+
+    function getLakeBottomHeight(wx, wz) {
+      const lake = getLakeAt(wx, wz);
+      if (!lake) return getHeight(wx, wz);
+      return getLakeBottomHeightForDescriptor(lake, wx, wz);
+    }
+
+    function chunkIntersectsLake(cx, cz, lake) {
+      const ox = cx * CHUNK_SIZE;
+      const oz = cz * CHUNK_SIZE;
+      const minX = ox;
+      const maxX = ox + CHUNK_SIZE;
+      const minZ = oz;
+      const maxZ = oz + CHUNK_SIZE;
+      const waterRadius = getLakeWaterRadius(lake);
+
+      if (lake.cx + waterRadius < minX) return false;
+      if (lake.cx - waterRadius > maxX) return false;
+      if (lake.cz + waterRadius < minZ) return false;
+      if (lake.cz - waterRadius > maxZ) return false;
+      return true;
+    }
+
+    function createLakeSurface(lake) {
+      if (lakes.has(lake.key)) return;
+      const half = getLakeWaterRadius(lake);
+      const depth = Math.max(LAKE_MIN_VISIBLE_DEPTH, lake.depth * 1.35);
+      const geo = new THREE.CylinderGeometry(half, half, depth, 32);
+      const waterBody = new THREE.Mesh(geo, sharedBackdropWaterMaterial);
+      // Keep the water top flat at the lake level, sink thickness downward.
+      waterBody.position.set(lake.cx, lake.level - depth * 0.5, lake.cz);
+      waterBody.castShadow = false;
+      waterBody.receiveShadow = false;
+      waterBody.renderOrder = 2;
+      scene.add(waterBody);
+
+      lakes.set(lake.key, { surface: waterBody, volume: null });
+    }
+
+    function disposeLakeSurface(lakeKey) {
+      const water = lakes.get(lakeKey);
+      if (!water) return;
+      if (water.surface) {
+        scene.remove(water.surface);
+        water.surface.geometry.dispose();
+      }
+      if (water.volume) {
+        scene.remove(water.volume);
+        water.volume.geometry.dispose();
+      }
+      lakes.delete(lakeKey);
+    }
+
+    function syncVisibleLakes(neededChunkKeys) {
+      const requiredLakes = new Set();
+
+      for (const chunk of neededChunkKeys) {
+        const [cx, cz] = chunk.split(',').map(Number);
+        const ox = cx * CHUNK_SIZE;
+        const oz = cz * CHUNK_SIZE;
+        const margin = LAKE_MAX_RADIUS + 2;
+        const lxMin = Math.floor((ox - margin) / LAKE_CELL) - 1;
+        const lxMax = Math.floor((ox + CHUNK_SIZE + margin) / LAKE_CELL) + 1;
+        const lzMin = Math.floor((oz - margin) / LAKE_CELL) - 1;
+        const lzMax = Math.floor((oz + CHUNK_SIZE + margin) / LAKE_CELL) + 1;
+
+        for (let lz = lzMin; lz <= lzMax; lz++) {
+          for (let lx = lxMin; lx <= lxMax; lx++) {
+            const lake = getLakeDescriptor(lx, lz);
+            if (!lake) continue;
+            if (!chunkIntersectsLake(cx, cz, lake)) continue;
+            requiredLakes.add(lake.key);
+            createLakeSurface(lake);
+          }
         }
+      }
 
-        if(typeof playerBody.setLinvel === 'function') {
-          playerBody.setLinvel(desired, true);
-        } else if(typeof playerBody.setLinearVelocity === 'function') {
-          playerBody.setLinearVelocity(desired, true);
+      for (const lakeKey of lakes.keys()) {
+        if (!requiredLakes.has(lakeKey)) disposeLakeSurface(lakeKey);
+      }
+    }
+
+    // ============================================================
+    // WATER FOAM SYSTEM - Realistic flat foam on water surface
+    // ============================================================
+    const splashEffects = []; // Temporary splash effects that fade out
+    const waterlineFoams = new Map(); // Persistent foam for floating objects (object -> foam data)
+
+    // Create flat foam texture directly on water surface
+    function createFoamMesh(x, z, baseRadius, lake, isSplash = false) {
+      const group = new THREE.Group();
+
+      // Create flat foam patches using CircleGeometry lying flat on water
+      const patchCount = isSplash ? 12 : 8;
+
+      for (let i = 0; i < patchCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * baseRadius * 0.9;
+        const patchRadius = 0.03 + Math.random() * 0.08;
+
+        // Flat circle on water surface
+        const geometry = new THREE.CircleGeometry(patchRadius, 8);
+        const material = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.5 + Math.random() * 0.5,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+
+        const patch = new THREE.Mesh(geometry, material);
+        patch.position.set(
+          Math.cos(angle) * dist,
+          0, // Exactly on water surface
+          Math.sin(angle) * dist
+        );
+        // Rotate to lie flat on water (XZ plane)
+        patch.rotation.x = -Math.PI / 2;
+        patch.rotation.z = Math.random() * Math.PI;
+
+        group.add(patch);
+      }
+
+      // Add larger irregular foam shapes
+      const clumpCount = isSplash ? 6 : 4;
+      for (let i = 0; i < clumpCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * baseRadius * 0.7;
+
+        // Irregular shape using distorted circle
+        const clumpRadius = 0.05 + Math.random() * 0.1;
+        const geometry = new THREE.CircleGeometry(clumpRadius, 6);
+
+        // Distort vertices for organic look
+        const pos = geometry.attributes.position;
+        for (let j = 0; j < pos.count; j++) {
+          const px = pos.getX(j);
+          const py = pos.getY(j);
+          const distort = 0.7 + Math.random() * 0.6;
+          pos.setX(j, px * distort);
+          pos.setY(j, py * distort);
         }
+        geometry.computeVertexNormals();
 
-      } else {
-        // Fallback old movement
-        const mv = new THREE.Vector3();
-        if(keys['KeyW']||keys['ArrowUp'])    mv.add(fwdH);
-        if(keys['KeyS']||keys['ArrowDown'])  mv.sub(fwdH);
-        if(keys['KeyA']||keys['ArrowLeft'])  mv.sub(rgtH);
-        if(keys['KeyD']||keys['ArrowRight']) mv.add(rgtH);
-        if(mv.lengthSq() > 0) mv.normalize().multiplyScalar(spd * dt);
-        playerPos.x += mv.x;
-        playerPos.z += mv.z;
+        const material = new THREE.MeshBasicMaterial({
+          color: 0xf0f5ff, // Slightly blue-white
+          transparent: true,
+          opacity: 0.6 + Math.random() * 0.4,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
 
-        const groundY = sampleGround(playerPos.x, playerPos.z) + EYE_HEIGHT;
-        velY += GRAVITY_ACC * dt;
-        playerPos.y += velY * dt;
-        if(playerPos.y < groundY) {
-          playerPos.y = groundY;
-          isGrounded = true;
-          velY = 0;
+        const clump = new THREE.Mesh(geometry, material);
+        clump.position.set(
+          Math.cos(angle) * dist,
+          0,
+          Math.sin(angle) * dist
+        );
+        clump.rotation.x = -Math.PI / 2;
+        clump.rotation.z = Math.random() * Math.PI * 2;
+
+        group.add(clump);
+      }
+
+      // Position exactly at water level
+      group.position.set(x, lake.level + 0.005, z); // Tiny offset to prevent z-fighting
+      return group;
+    }
+
+    // Create splash effect with expanding foam ring
+    function createSplash(x, z, radius, lake) {
+      const foam = createFoamMesh(x, z, radius, lake, true);
+      foam.userData = {
+        born: performance.now(),
+        duration: 2000,
+        lake,
+        baseRadius: radius
+      };
+      scene.add(foam);
+      splashEffects.push(foam);
+    }
+
+    // Create waterline foam - foam ring around floating object
+    function createWaterlineFoam(obj, objPos, objRadius, lake) {
+      const foam = createFoamMesh(objPos.x, objPos.z, objRadius * 0.4, lake, false);
+      foam.userData = { obj, lake, radius: objRadius };
+      scene.add(foam);
+      return foam;
+    }
+
+    // Track objects that just entered water (for splash)
+    const waterEntryTracker = new Map(); // object id -> { wasInWater, entryTime }
+
+    // Helper to dispose a foam group (with children)
+    function disposeFoamGroup(foam) {
+      for (const child of foam.children) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      }
+      scene.remove(foam);
+    }
+
+    function updateFoamSystem(dt) {
+      const now = performance.now();
+
+      // Update and remove expired splash effects
+      for (let i = splashEffects.length - 1; i >= 0; i--) {
+        const splash = splashEffects[i];
+        const age = now - splash.userData.born;
+        const progress = age / splash.userData.duration;
+
+        if (progress >= 1) {
+          disposeFoamGroup(splash);
+          splashEffects.splice(i, 1);
         } else {
-          isGrounded = false;
+          // Fade out all children and expand the group
+          const opacity = 0.8 * (1 - progress);
+          for (const child of splash.children) {
+            if (child.material) {
+              child.material.opacity = opacity * (0.6 + Math.random() * 0.4);
+            }
+          }
+          splash.scale.setScalar(1 + progress * 2);
         }
-        if(keys['Space'] && isGrounded) {
-          velY = JUMP_VEL;
-          isGrounded = false;
+      }
+
+      // Process projectiles for splash and waterline foam
+      for (const p of projectiles) {
+        const t = p.body.translation();
+        const lake = getLakeAtWater(t.x, t.z);
+        const objId = p.mesh.uuid;
+        const isInWater = lake && t.y < lake.level;
+        const wasTracked = waterEntryTracker.get(objId);
+
+        if (isInWater) {
+          if (!wasTracked || !wasTracked.wasInWater) {
+            // Just entered water - create splash
+            createSplash(t.x, t.z, 0.5, lake);
+            waterEntryTracker.set(objId, { wasInWater: true, entryTime: now, lake });
+          }
+
+          // Check if floating (partially above water)
+          const objRadius = p.mesh.geometry?.boundingSphere?.radius || 0.25;
+          const isFloating = t.y + objRadius > lake.level && t.y - objRadius < lake.level;
+
+          if (isFloating) {
+            // Update or create waterline foam
+            if (!waterlineFoams.has(objId)) {
+              const foam = createWaterlineFoam(p, t, objRadius, lake);
+              waterlineFoams.set(objId, { foam, obj: p, lake });
+            } else {
+              const foamData = waterlineFoams.get(objId);
+              foamData.foam.position.set(t.x, lake.level + 0.02, t.z);
+            }
+          } else {
+            // Fully submerged - remove waterline foam
+            if (waterlineFoams.has(objId)) {
+              const foamData = waterlineFoams.get(objId);
+              disposeFoamGroup(foamData.foam);
+              waterlineFoams.delete(objId);
+            }
+          }
+        } else {
+          // Not in water - clean up
+          if (waterlineFoams.has(objId)) {
+            const foamData = waterlineFoams.get(objId);
+            disposeFoamGroup(foamData.foam);
+            waterlineFoams.delete(objId);
+          }
+          waterEntryTracker.set(objId, { wasInWater: false, entryTime: null });
+        }
+      }
+
+      // Process rigid bodies for splash and waterline foam
+      for (const rb of rigidBodies) {
+        if (rb.body.isFixed()) continue;
+        const t = rb.body.translation();
+        const lake = getLakeAtWater(t.x, t.z);
+        const objId = rb.mesh.uuid;
+        const isInWater = lake && t.y < lake.level;
+        const wasTracked = waterEntryTracker.get(objId);
+
+        if (isInWater) {
+          if (!wasTracked || !wasTracked.wasInWater) {
+            // Just entered water - create splash
+            createSplash(t.x, t.z, 0.8, lake);
+            waterEntryTracker.set(objId, { wasInWater: true, entryTime: now, lake });
+          }
+
+          // Check if floating (partially above water)
+          const objRadius = rb.mesh.geometry?.boundingSphere?.radius || 0.6;
+          const isFloating = t.y + objRadius > lake.level && t.y - objRadius < lake.level;
+
+          if (isFloating) {
+            // Update or create waterline foam
+            if (!waterlineFoams.has(objId)) {
+              const foam = createWaterlineFoam(rb, t, objRadius, lake);
+              waterlineFoams.set(objId, { foam, obj: rb, lake });
+            } else {
+              const foamData = waterlineFoams.get(objId);
+              foamData.foam.position.set(t.x, lake.level + 0.02, t.z);
+            }
+          } else {
+            // Fully submerged - remove waterline foam
+            if (waterlineFoams.has(objId)) {
+              const foamData = waterlineFoams.get(objId);
+              disposeFoamGroup(foamData.foam);
+              waterlineFoams.delete(objId);
+            }
+          }
+        } else {
+          // Not in water - clean up
+          if (waterlineFoams.has(objId)) {
+            const foamData = waterlineFoams.get(objId);
+            disposeFoamGroup(foamData.foam);
+            waterlineFoams.delete(objId);
+          }
+          waterEntryTracker.set(objId, { wasInWater: false, entryTime: null });
         }
       }
     }
-  }
 
-  camera.position.copy(playerPos);
-  camera.rotation.order = 'YXZ';
-  camera.rotation.y = yaw;
-  camera.rotation.x = pitch;
-  updateWaterViewState();
+    // ============================================================
+    // DANCING BALLS IN STARTING LAKE (from lake_scene files)
+    // ============================================================
+    const dancingBalls = [];
+    const dancingBallsBodies = []; // Physics bodies for the balls
+    let dancingBallsPlatform = null;
+    let dancingBallsPlatformBody = null; // Physics body for platform
+    let dancingBallsModel = null;
+    let dancingBallsMixer = null;
+    let startingLake = null;
+    let iceColorNode = null;
 
-  document.getElementById('ui').textContent = flyMode
-    ? '🕊️ מצב טיסה — F לביטול | E/Space עלה | Q רד'
-    : (isLocked ? '🌿 Lowpoly World — ESC לשחרר עכבר' : '🌿 לחץ להנעלת עכבר');
-
-  updateChunks(playerPos.x, playerPos.z);
-
-  for(const b of birds) {
-    b.userData.t += dt;
-    const d = b.userData;
-    d.angle += d.speed;
-    const tx = playerPos.x + Math.cos(d.angle)*d.rad;
-    const tz = playerPos.z + Math.sin(d.angle)*d.rad;
-    b.position.x += (tx - b.position.x)*0.01;
-    b.position.z += (tz - b.position.z)*0.01;
-    b.position.y = d.height + Math.sin(d.t*0.7)*3;
-    b.lookAt(b.position.x+Math.cos(d.angle+Math.PI/2), b.position.y, b.position.z+Math.sin(d.angle+Math.PI/2));
-    const fa = Math.sin(d.t*d.flapSpeed)*d.flapAmp;
-    b.children[0].rotation.z = Math.PI/2 + fa;
-    b.children[1].rotation.z = -Math.PI/2 - fa;
-  }
-
-  // Animate dancing balls in starting lake
-  const animTime = performance.now() / 1000;
-  animateDancingBalls(animTime, dt);
-  
-  // Update foam system (splash + waterline foam)
-  updateFoamSystem(dt);
-  
-  // Sun and shadows are completely fixed in world space - no movement
-  // Sun disc and glow positions are set once at initialization
-
-  // Step physics
-  stepPhysics(dt);
-
-  renderFrame();
-}
-
-// ============================================================
-// RAPIER PHYSICS - loaded via dynamic ESM import
-// ============================================================
-let RAPIER = null;
-let physWorld = null;
-const rigidBodies = []; // {mesh, body}
-const projectiles = []; // {mesh, body, born}
-
-// Terrain colliders per chunk (static) so bullets don't fall through visual ground
-const terrainColliders = new Map(); // key -> RAPIER.Collider
-
-// Static colliders for decorations (trees/rocks/bushes) so projectiles/blocks collide with them.
-// For performance and simplicity these are fixed colliders (no rigid bodies).
-const decorationColliders = []; // RAPIER.Collider[]
-let decorationsDirty = false;
-
-// map from Three.js mesh -> rigid body for easy lookup
-const meshToBody = new Map();
-
-async function loadRapier() {
-  // jsdelivr ESM URL for rapier3d-compat 0.14.0 (stable, widely cached)
-  const R = await import('https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/rapier.es.js');
-  await R.init();
-  RAPIER = R;
-
-  // Create world
-  physWorld = new RAPIER.World({ x: 0, y: -25, z: 0 });
-
-  // NOTE:
-  // We intentionally don't use a single flat ground plane.
-  // Instead, each rendered terrain chunk gets its own static collider,
-  // matching the visual mesh so projectiles don't fall through.
-
-  console.log('✓ Rapier physics ready');
-
-  // Create colliders for decorations already created before Rapier loaded
-  clearDecorationColliders();
-  for(const [, grp] of objects) addDecorationCollidersFromGroup(grp);
-
-  initPlayerPhysics();
-
-  buildTower();
-  
-  // Add physics to dancing balls after Rapier is loaded
-  addDancingBallsPhysics();
-}
-
-function addPhysicsBox(mesh, hw, hh, hd, mass) {
-  const t = mesh.position;
-  const q = mesh.quaternion;
-  let bodyDesc = mass === 0
-    ? RAPIER.RigidBodyDesc.fixed()
-    : RAPIER.RigidBodyDesc.dynamic();
-  bodyDesc.setTranslation(t.x, t.y, t.z);
-  bodyDesc.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
-
-  // Extra damping helps stacks settle instead of jittering/drifting.
-  if(mass !== 0) {
-    if(typeof bodyDesc.setLinearDamping === 'function') bodyDesc.setLinearDamping(0.15);
-    if(typeof bodyDesc.setAngularDamping === 'function') bodyDesc.setAngularDamping(0.25);
-  }
-
-  const body = physWorld.createRigidBody(bodyDesc);
-  const colDesc = RAPIER.ColliderDesc.cuboid(hw, hh, hd)
-    .setRestitution(0.05)
-    .setFriction(0.9);
-  physWorld.createCollider(colDesc, body);
-  rigidBodies.push({ mesh, body });
-  meshToBody.set(mesh, body);
-  return body;
-}
-
-function addPhysicsSphere(mesh, r, mass) {
-  const t = mesh.position;
-  const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-    .setTranslation(t.x, t.y, t.z);
-  const body = physWorld.createRigidBody(bodyDesc);
-
-  // Apply mass by setting density (Rapier uses collider density to derive mass).
-  // Without this, bullets can feel like they "drop" immediately due to being too light.
-  const density = Math.max(0.1, mass); // treat 'mass' as density-like scalar
-  const colDesc = RAPIER.ColliderDesc.ball(r)
-    .setDensity(density)
-    .setRestitution(0.35)
-    .setFriction(0.4);
-
-  physWorld.createCollider(colDesc, body);
-  rigidBodies.push({ mesh, body });
-  return body;
-}
-
-function clearDecorationColliders() {
-  if(!physWorld) return;
-  for(const c of decorationColliders) {
-    physWorld.removeCollider(c, true);
-  }
-  decorationColliders.length = 0;
-}
-
-function addDecorationCollidersFromGroup(group) {
-  if(!physWorld || !RAPIER || !group) return;
-
-  // Simple & fast: approximate each mesh in the decoration group with an oriented bounding box collider.
-  // This is not perfect but gives solid physical interaction.
-  const meshes = [];
-  group.traverse(obj => { if(obj && obj.isMesh) meshes.push(obj); });
-
-  for(const m of meshes) {
-    const geo = m.geometry;
-    if(!geo) continue;
-    if(!geo.boundingBox) geo.computeBoundingBox();
-    const bb = geo.boundingBox;
-    if(!bb) continue;
-
-    const size = new THREE.Vector3();
-    bb.getSize(size);
-    const center = new THREE.Vector3();
-    bb.getCenter(center);
-
-    // World transform
-    const worldPos = new THREE.Vector3();
-    m.getWorldPosition(worldPos);
-    const worldQuat = new THREE.Quaternion();
-    m.getWorldQuaternion(worldQuat);
-
-    // Bounding box center in world space
-    const worldCenter = center.clone().applyQuaternion(worldQuat).add(worldPos);
-
-    // Use scaled half-extents (avoid zeros)
-    const sx = m.scale.x || 1, sy = m.scale.y || 1, sz = m.scale.z || 1;
-    const hx = Math.max(0.05, size.x * 0.5 * sx);
-    const hy = Math.max(0.05, size.y * 0.5 * sy);
-    const hz = Math.max(0.05, size.z * 0.5 * sz);
-
-    const colDesc = RAPIER.ColliderDesc.cuboid(hx, hy, hz)
-      .setTranslation(worldCenter.x, worldCenter.y, worldCenter.z)
-      .setRotation({ x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w })
-      .setRestitution(0.05)
-      .setFriction(0.9);
-
-    const col = physWorld.createCollider(colDesc);
-    decorationColliders.push(col);
-  }
-}
-
-function buildTower() {
-  if(!RAPIER) return;
-  // Remove old
-  for(const rb of rigidBodies) { scene.remove(rb.mesh); physWorld.removeRigidBody(rb.body); }
-  rigidBodies.length = 0;
-  for(const p of projectiles) scene.remove(p.mesh);
-  projectiles.length = 0;
-  meshToBody.clear();
-
-  // Ensure colliders exist for currently visible chunks (Rapier may load after terrain render)
-  for(const [key, mesh] of chunks) {
-    if(terrainColliders.has(key)) continue;
-    const geo = mesh.geometry;
-    const parts = key.split(',').map(Number);
-    const cx = parts[0], cz = parts[1];
-    const ox = cx * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
-
-    if(physWorld && RAPIER) {
-      const posAttr = geo.getAttribute('position');
-      const idxAttr = geo.index;
-
-      const verts = new Float32Array(posAttr.count * 3);
-      for(let i = 0; i < posAttr.count; i++) {
-        verts[i*3+0] = posAttr.getX(i);
-        verts[i*3+1] = posAttr.getY(i);
-        verts[i*3+2] = posAttr.getZ(i);
+    function createDancingBalls() {
+      // Find the lake at or near the starting position (0,0)
+      startingLake = getLakeAt(0, 0);
+      if (!startingLake) {
+        const lx = Math.floor(0 / LAKE_CELL + 0.5);
+        const lz = Math.floor(0 / LAKE_CELL + 0.5);
+        startingLake = getLakeDescriptor(lx, lz);
       }
 
-      let indices;
-      if(idxAttr) {
-        indices = new Uint32Array(idxAttr.count);
-        for(let i = 0; i < idxAttr.count; i++) indices[i] = idxAttr.getX(i);
-      } else {
-        indices = new Uint32Array(posAttr.count);
-        for(let i = 0; i < posAttr.count; i++) indices[i] = i;
+      if (!startingLake) {
+        console.log('No starting lake found for dancing balls');
+        return;
       }
 
-      const colDesc = RAPIER.ColliderDesc.trimesh(verts, indices)
-        .setTranslation(ox, 0, oz)
-        .setRestitution(0.0)
-        .setFriction(0.9);
-      const collider = physWorld.createCollider(colDesc);
-      terrainColliders.set(key, collider);
+      console.log('Creating dancing balls in lake at:', startingLake.cx, startingLake.cz, 'level:', startingLake.level);
+
+      // Load texture for the ice balls (from lake_scene files)
+      const textureLoader = new THREE.TextureLoader();
+      const iceDiffuse = textureLoader.load('water.jpg');
+      iceDiffuse.wrapS = THREE.RepeatWrapping;
+      iceDiffuse.wrapT = THREE.RepeatWrapping;
+      iceDiffuse.colorSpace = THREE.NoColorSpace;
+
+      // Create the ice color node using triplanar texture (from lake_scene files)
+      iceColorNode = triplanarTexture(texture(iceDiffuse)).add(color(0x0066ff)).mul(0.8);
+
+      // Create floating icosahedron balls (from lake_scene 15 & 17)
+      const iceGeometry = new THREE.IcosahedronGeometry(1, 3);
+      const iceMaterial = new THREE.MeshStandardNodeMaterial({ colorNode: iceColorNode });
+
+      const count = 100;
+      const scale = 3.5;
+      const column = 10;
+
+      const objectsGroup = new THREE.Group();
+      for (let i = 0; i < count; i++) {
+        const x = i % column;
+        const y = Math.floor(i / column);
+        const mesh = new THREE.Mesh(iceGeometry, iceMaterial);
+        mesh.position.set(x * scale, 0, y * scale);
+        mesh.rotation.set(Math.random(), Math.random(), Math.random());
+        mesh.castShadow = true;
+        objectsGroup.add(mesh);
+      }
+
+      // Position the group centered over the lake
+      objectsGroup.position.set(
+        startingLake.cx - ((column - 1) * scale) * 0.5,
+        startingLake.level - 1,
+        startingLake.cz - ((count / column) * scale) * 0.5
+      );
+      scene.add(objectsGroup);
+      dancingBalls.push(...objectsGroup.children);
+
+      // Create the cylindrical platform (from lake_scene 17)
+      const platformGeo = new THREE.CylinderGeometry(1.1, 1.1, 10);
+      const platformMat = new THREE.MeshStandardNodeMaterial({ colorNode: iceColorNode });
+      dancingBallsPlatform = new THREE.Mesh(platformGeo, platformMat);
+      dancingBallsPlatform.position.set(startingLake.cx, startingLake.level - 5, startingLake.cz);
+      dancingBallsPlatform.castShadow = true;
+      dancingBallsPlatform.receiveShadow = true;
+      scene.add(dancingBallsPlatform);
+
+      // Load the dancing character model (Michelle from lake_scene 17)
+      const gltfLoader = new GLTFLoader();
+      gltfLoader.load(
+        'https://threejs.org/examples/models/gltf/Michelle.glb',
+        (gltf) => {
+          dancingBallsModel = gltf.scene;
+          dancingBallsMixer = new THREE.AnimationMixer(dancingBallsModel);
+          const action = dancingBallsMixer.clipAction(gltf.animations[0]);
+          action.play();
+          dancingBallsModel.position.set(startingLake.cx, startingLake.level, startingLake.cz);
+          dancingBallsModel.scale.set(1, 1, 1);
+          scene.add(dancingBallsModel);
+          console.log('Dancing model loaded');
+
+          // Add physics to the dancer model after it loads
+          addDancerPhysics();
+        },
+        undefined,
+        () => {
+          console.log('Could not load dancing model');
+        }
+      );
+
+      console.log('Created', dancingBalls.length, 'floating ice balls');
     }
-  }
 
-  // Place tower in front of player
-  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-  const gx  = playerPos.x + fwd.x * 14;
-  const gz  = playerPos.z + fwd.z * 14;
-  const gy  = sampleGround(gx, gz);
+    // Add physics to dancing balls after Rapier is loaded
+    function addDancingBallsPhysics() {
+      if (!RAPIER || !physWorld || !startingLake) return;
 
-  // Ground slab under tower (static)
-  // Use a LEVEL foundation so the stack starts stable even if the terrain below is sloped.
-  const SLAB_CLEARANCE = 0.55;
-  const slabGeo = new THREE.BoxGeometry(12, 0.5, 6);
-  const slabMat = new THREE.MeshPhongMaterial({ color: 0x8a7060, flatShading: true });
-  const slabMesh = new THREE.Mesh(slabGeo, slabMat);
-  slabMesh.receiveShadow = true;
-  slabMesh.castShadow = true;
-  slabMesh.position.set(gx, gy + 0.25 + SLAB_CLEARANCE, gz);
-  slabMesh.rotation.set(0, 0, 0);
-  scene.add(slabMesh);
-  addPhysicsBox(slabMesh, 6, 0.25, 3, 0); // static
+      // Add physics to each ball
+      for (const ball of dancingBalls) {
+        const worldPos = new THREE.Vector3();
+        ball.getWorldPosition(worldPos);
 
-  // Colored blocks
-  const bw = 0.6, bh = 0.6, bd = 0.6;
-  const wide = 4, tall = 7;
-  const BLOCK_CLEARANCE = 0.28;
-  const cols = [0xe74c3c,0xe67e22,0xf1c40f,0x2ecc71,0x3498db,0x9b59b6,0x1abc9c,0xe91e63];
-  for(let row = 0; row < tall; row++) {
-    for(let col = 0; col < wide; col++) {
-      const wx = gx + (col - (wide-1)/2) * (bw*2 + 0.05);
-      const wy = gy + 0.3 + bh + row * (bh * 2 + 0.01) + SLAB_CLEARANCE + BLOCK_CLEARANCE;
-      const color = cols[(row * wide + col) % cols.length];
-      const geo  = new THREE.BoxGeometry(bw*2, bh*2, bd*2);
-      const mat  = new THREE.MeshPhongMaterial({ color, flatShading: true, shininess: 8 });
+        const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(worldPos.x, worldPos.y, worldPos.z);
+        const body = physWorld.createRigidBody(bodyDesc);
+
+        const colDesc = RAPIER.ColliderDesc.ball(1.0) // radius 1 for icosahedron
+          .setRestitution(0.6)
+          .setFriction(0.3)
+          .setDensity(0.5);
+        physWorld.createCollider(colDesc, body);
+
+        dancingBallsBodies.push({ mesh: ball, body });
+      }
+
+      // Add physics to platform (static)
+      if (dancingBallsPlatform) {
+        const platformPos = dancingBallsPlatform.position;
+        const bodyDesc = RAPIER.RigidBodyDesc.fixed()
+          .setTranslation(platformPos.x, platformPos.y, platformPos.z);
+        dancingBallsPlatformBody = physWorld.createRigidBody(bodyDesc);
+
+        const colDesc = RAPIER.ColliderDesc.cylinder(5, 1.1) // half-height 5, radius 1.1
+          .setRestitution(0.3)
+          .setFriction(0.8);
+        physWorld.createCollider(colDesc, dancingBallsPlatformBody);
+        console.log('Added physics to dancing balls platform');
+      }
+
+      console.log('Added physics to', dancingBallsBodies.length, 'dancing balls');
+    }
+
+    function animateDancingBalls(time, dt) {
+      // Animate the dancing model
+      if (dancingBallsMixer && dancingBallsModel) {
+        dancingBallsMixer.update(dt);
+      }
+
+      // Animate the floating icosahedron balls (original animation from lake_scene)
+      for (const object of dancingBalls) {
+        object.position.y = Math.sin(time + object.id) * 0.3;
+        object.rotation.y += dt * 0.3;
+      }
+
+      // Sync physics bodies with animated positions and apply water physics
+      for (let i = 0; i < dancingBallsBodies.length; i++) {
+        const { mesh, body } = dancingBallsBodies[i];
+        const worldPos = new THREE.Vector3();
+        mesh.getWorldPosition(worldPos);
+
+        // Sync body position with animated mesh position
+        if (typeof body.setTranslation === 'function') {
+          body.setTranslation({ x: worldPos.x, y: worldPos.y, z: worldPos.z }, false);
+        }
+
+        // Apply water physics if ball is in water
+        if (startingLake && worldPos.y < startingLake.level) {
+          const vel = body.linvel();
+          const waterDrag = 0.92;
+          const buoyancy = 2.0;
+
+          body.setLinvel({
+            x: vel.x * waterDrag,
+            y: vel.y * waterDrag + buoyancy * dt,
+            z: vel.z * waterDrag
+          }, false);
+        }
+      }
+    }
+
+    // ============================================================
+    // BIRDS
+    // ============================================================
+    const birds = [];
+    for (let i = 0; i < 25; i++) {
+      const b = new THREE.Group();
+      // simple V-shape wings
+      const wL = jitter(new THREE.ConeGeometry(0.25, 0.6, 3), 0.05);
+      const wR = jitter(new THREE.ConeGeometry(0.25, 0.6, 3), 0.05);
+      const mL = new THREE.Mesh(wL, matBird);
+      const mR = new THREE.Mesh(wR, matBird);
+      mL.rotation.z = Math.PI / 2;
+      mR.rotation.z = -Math.PI / 2;
+      mL.position.x = -0.3;
+      mR.position.x = 0.3;
+      b.add(mL); b.add(mR);
+      const angle = Math.random() * Math.PI * 2;
+      const rad = 40 + Math.random() * 80;
+      b.position.set(Math.cos(angle) * rad, 20 + Math.random() * 30, Math.sin(angle) * rad);
+      b.userData = {
+        angle, rad,
+        speed: 0.003 + Math.random() * 0.004,
+        height: 20 + Math.random() * 30,
+        flapSpeed: 3 + Math.random() * 3,
+        flapAmp: 0.4 + Math.random() * 0.3,
+        t: Math.random() * 100
+      };
+      scene.add(b);
+      birds.push(b);
+    }
+
+    // ============================================================
+    // CHUNK SYSTEM
+    // ============================================================
+    const chunks = new Map();
+    const objects = new Map(); // decorations per chunk
+
+    function chunkKey(cx, cz) { return `${cx},${cz}`; }
+
+    function buildChunk(cx, cz) {
+      const key = chunkKey(cx, cz);
+      if (chunks.has(key)) return;
+
+      const ox = cx * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
+      const N = CHUNK_SEGS;
+      const verts = [], colors = [], indices = [];
+
+      // Build height grid
+      const heights = [];
+      for (let z = 0; z <= N; z++) for (let x = 0; x <= N; x++) {
+        const wx = ox + x * CELL, wz = oz + z * CELL;
+        const h = getLakeBottomHeight(wx, wz);
+        heights.push(h);
+      }
+
+      // Build geometry
+      for (let z = 0; z <= N; z++) for (let x = 0; x <= N; x++) {
+        const wx = ox + x * CELL, wz = oz + z * CELL;
+        const h = heights[z * (N + 1) + x];
+        verts.push(x * CELL, h, z * CELL);
+        // color
+        const lake = isLake(wx, wz);
+        const path = !lake && isPath(wx, wz);
+        let r, g, b;
+        if (lake) {
+          // Check if this is lake floor (flat bottom) or lake wall (sloped sides)
+          // Lake floor = height is close to the bottom of the lake
+          // Lake wall = height is significantly higher than the bottom
+          const lakeDesc = getLakeAt(wx, wz);
+          const isLakeFloor = lakeDesc && (h < lakeDesc.bottom + 2.0); // Within 2 units of lake bottom
+
+          if (isLakeFloor) {
+            // Lake floor - deep dark blue like deep ocean water (0x0A1628 - Deep Navy)
+            r = 0.039; g = 0.086; b = 0.157;
+          } else {
+            // Lake walls - sandy/earthy color like the rest of the terrain
+            r = 0.6; g = 0.45; b = 0.3;
+          }
+        }
+        else if (path) { r = 0.68; g = 0.52; b = 0.28; }
+        else if (h < 1.5) { r = 0.6; g = 0.45; b = 0.3; } // sandy
+        else { // grass variation
+          const gv = 0.32 + fbm(wx * 0.04, wz * 0.04) * 0.15;
+          r = 0.2; g = gv + 0.1; b = 0.15;
+        }
+        colors.push(r, g, b);
+      }
+      for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
+        const a = z * (N + 1) + x, b = a + 1, c = a + (N + 1), d = c + 1;
+        indices.push(a, c, b, b, c, d);
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0 });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = mesh.receiveShadow = true;
-      mesh.position.set(wx, wy, gz);
+      mesh.position.set(ox, 0, oz);
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
       scene.add(mesh);
-      addPhysicsBox(mesh, bw, bh, bd, 3);
+      chunks.set(key, mesh);
+
+      // --- Physics collider for this terrain chunk (static trimesh) ---
+      // IMPORTANT: Build vertices in CHUNK-LOCAL coordinates (same as the Three.js geometry),
+      // and place the collider using translation (ox, oz). This keeps physics aligned with visuals.
+      if (physWorld && RAPIER) {
+        const posAttr = geo.getAttribute('position');
+        const idxAttr = geo.index;
+
+        // Positions in chunk-local space
+        const verts = new Float32Array(posAttr.count * 3);
+        for (let i = 0; i < posAttr.count; i++) {
+          verts[i * 3 + 0] = posAttr.getX(i);
+          verts[i * 3 + 1] = posAttr.getY(i);
+          verts[i * 3 + 2] = posAttr.getZ(i);
+        }
+
+        // Indices
+        let indices;
+        if (idxAttr) {
+          indices = new Uint32Array(idxAttr.count);
+          for (let i = 0; i < idxAttr.count; i++) indices[i] = idxAttr.getX(i);
+        } else {
+          indices = new Uint32Array(posAttr.count);
+          for (let i = 0; i < posAttr.count; i++) indices[i] = i;
+        }
+
+        // Create collider directly (fixed body not needed)
+        // trimesh expects vertices as Float32Array and indices as Uint32Array
+        const colDesc = RAPIER.ColliderDesc.trimesh(verts, indices)
+          .setTranslation(ox, 0, oz)
+          .setRestitution(0.0)
+          .setFriction(0.9);
+
+        const collider = physWorld.createCollider(colDesc);
+        terrainColliders.set(key, collider);
+      }
+
+      // Decorations - use world coords directly, no group offset
+      const group = new THREE.Group();
+      scene.add(group);
+      const rng = (s) => { let v = hash(cx * 17 + s, cz * 31 + s * 7); return v; };
+
+      const decCount = HIGH_QUALITY
+        ? 30 + Math.floor(rng(1) * 20)
+        : 18 + Math.floor(rng(1) * 10);
+      for (let i = 0; i < decCount; i++) {
+        // World-space position of this decoration
+        const tx = ox + rng(i * 7 + 2) * CHUNK_SIZE;
+        const tz = oz + rng(i * 7 + 3) * CHUNK_SIZE;
+        if (isLake(tx, tz) || isPath(tx, tz)) continue;
+        const h = getHeight(tx, tz);   // exact height at this world pos
+        if (h < 1) continue;
+        const r4 = rng(i * 7 + 4);
+        let obj;
+        // Seeded rng for this specific object - deterministic every rebuild
+        const objRng = (k) => hash(cx * 113 + i * 71 + k * 37, cz * 97 + i * 53 + k * 19);
+        if (r4 < 0.25) {
+          obj = makeTree(tx, h, tz, 0.7 + rng(i * 7 + 5) * 0.8, objRng);
+        } else if (r4 < 0.45) {
+          obj = makeRock(tx, h, tz, objRng);
+        } else if (r4 < 0.65) {
+          obj = makeBush(tx, h, tz, objRng);
+        } else if (r4 < 0.9) {
+          obj = makeFlower(tx, h, tz, objRng);
+        }
+        if (obj) group.add(obj);
+      }
+
+      // No position offset - objects are in world space already
+      objects.set(key, group);
+
+      // Create physics colliders for decorations in this chunk
+      if (physWorld && RAPIER) addDecorationCollidersFromGroup(group);
     }
-  }
-  console.log('✓ Tower built:', rigidBodies.length, 'bodies');
-}
 
-function shoot() {
-  if(!RAPIER || !isLocked) return;
+    function removeChunk(cx, cz) {
+      const key = chunkKey(cx, cz);
+      const mesh = chunks.get(key);
+      if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); chunks.delete(key); }
+      const grp = objects.get(key);
+      if (grp) { scene.remove(grp); objects.delete(key); }
 
-  const R = 0.25;
-  const MUZZLE_SPEED = 65; // higher speed so it clearly goes forward
+      // Remove physics collider for this chunk
+      if (physWorld && terrainColliders.has(key)) {
+        physWorld.removeCollider(terrainColliders.get(key), true);
+        terrainColliders.delete(key);
+      }
 
-  // Direction from camera (includes pitch)
-  const dir = new THREE.Vector3(
-    -Math.sin(yaw) * Math.cos(pitch),
-     Math.sin(pitch),
-    -Math.cos(yaw) * Math.cos(pitch)
-  ).normalize();
+      // Remove & rebuild decoration colliders lazily (next frame) to avoid stutter in the middle of movement.
+      if (physWorld && RAPIER) decorationsDirty = true;
+    }
 
-  // Spawn slightly in front of the camera, and not intersecting the player/ground
-  const sp = camera.getWorldPosition(new THREE.Vector3())
-    .addScaledVector(dir, 2.2);
+    function updateChunks(px, pz) {
+      // Use floor so we don't thrash chunk rebuilds around boundaries.
+      // Rounding can cause rapid add/remove when hovering near edges -> stutter.
+      const curCX = Math.floor(px / CHUNK_SIZE);
+      const curCZ = Math.floor(pz / CHUNK_SIZE);
+      const needed = new Set();
+      const R = RENDER_CHUNKS;
+      for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+        if (dx * dx + dz * dz > R * R + 1) continue;
+        const cx = curCX + dx, cz = curCZ + dz;
+        needed.add(chunkKey(cx, cz));
+        buildChunk(cx, cz);
+      }
+      for (const [key] of chunks) {
+        if (!needed.has(key)) removeChunk(...key.split(',').map(Number));
+      }
+      syncVisibleLakes(needed);
+    }
 
-  const geo = new THREE.SphereGeometry(R, 10, 7);
-  const mat = new THREE.MeshPhongMaterial({ color: 0x1a1a2e, flatShading: true, shininess: 60 });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  mesh.position.copy(sp);
-  scene.add(mesh);
+    // ============================================================
+    // INPUT & POINTER LOCK
+    // ============================================================
+    const keys = {};
+    let yaw = 0, pitch = 0;
+    let started = false;
+    let flyMode = false;
+    let isLocked = false;
 
-  const body = addPhysicsSphere(mesh, R, 4);
+    renderer.domElement.style.cursor = 'crosshair';
+    renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
-  // Ensure it doesn't start "asleep" and add a small upward bias so it doesn't feel like it drops from you
-  // Rapier JS API differs between builds. Support both:
-  // - setLinvel({x,y,z}, wakeUp)
-  // - setLinearVelocity({x,y,z}, wakeUp)
-  // Also wake explicitly where supported.
-  const linvel = {
-    x: dir.x * MUZZLE_SPEED,
-    y: (dir.y + 0.03) * MUZZLE_SPEED,
-    z: dir.z * MUZZLE_SPEED,
-  };
+    // Click canvas = lock pointer (true FPS)
+    renderer.domElement.addEventListener('click', () => {
+      if (!started) return;
+      renderer.domElement.requestPointerLock();
+    });
 
-  if(typeof body.wakeUp === 'function') body.wakeUp();
+    document.getElementById('click-to-start').addEventListener('click', () => {
+      started = true;
+      document.getElementById('click-to-start').style.display = 'none';
+      renderer.domElement.requestPointerLock();
+    });
 
-  if(typeof body.setLinvel === 'function') {
-    body.setLinvel(linvel, true);
-  } else if(typeof body.setLinearVelocity === 'function') {
-    body.setLinearVelocity(linvel, true);
-  } else {
-    console.warn('RigidBody has no linear-velocity setter. Available keys:', Object.keys(body));
-  }
+    document.addEventListener('pointerlockchange', () => {
+      isLocked = document.pointerLockElement === renderer.domElement;
+    });
+    document.addEventListener('pointerlockerror', () => {
+      console.warn('Pointer lock failed');
+    });
 
-  // High CCD for fast projectile
-  if(typeof body.enableCcd === 'function') body.enableCcd(true);
+    document.addEventListener('mousemove', e => {
+      if (!isLocked) return;
+      yaw -= e.movementX * 0.002;
+      pitch -= e.movementY * 0.002;
+      pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
+    });
 
-  projectiles.push({ mesh, body, born: performance.now() });
-}
+    document.addEventListener('keydown', e => {
+      keys[e.code] = true;
+      if (e.code === 'KeyF') { flyMode = !flyMode; }
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+    });
+    document.addEventListener('keyup', e => { keys[e.code] = false; });
 
-// Sync Three.js meshes with Rapier body transforms
-function stepPhysics(dt) {
-  if(!physWorld) return;
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
 
-  // Rebuild decoration colliders in a controlled place (once) if chunks changed.
-  if(decorationsDirty) {
-    decorationsDirty = false;
-    clearDecorationColliders();
-    for(const [, g] of objects) addDecorationCollidersFromGroup(g);
-  }
-  physWorld.timestep = dt;
-  physWorld.step();
+    // ============================================================
+    // HELPERS
+    // ============================================================
+    function getTerrainY(x, z) {
+      return getLakeBottomHeight(x, z);
+    }
+    function getAvgHeight(x, z, radius) {
+      return Math.min(
+        getHeight(x, z), getHeight(x + radius, z), getHeight(x - radius, z),
+        getHeight(x, z + radius), getHeight(x, z - radius)
+      );
+    }
 
-  // Apply water physics to all rigid bodies
-  for(const rb of rigidBodies) {
-    if(rb.body.isFixed()) continue;
-    const t = rb.body.translation();
-    const r = rb.body.rotation();
-    rb.mesh.position.set(t.x, t.y, t.z);
-    rb.mesh.quaternion.set(r.x, r.y, r.z, r.w);
-    
-    // Check if in water
-    const lake = getLakeAtWater(t.x, t.z);
-    if(lake && t.y < lake.level) {
-      const vel = rb.body.linvel();
-      const waterDrag = 0.88;
-      const buoyancy = 3.5;
-      
-      const newVel = {
-        x: vel.x * waterDrag,
-        y: vel.y * waterDrag + buoyancy * dt,
-        z: vel.z * waterDrag
+    // ============================================================
+    // PHYSICS CONSTANTS
+    // ============================================================
+    const SPEED = 9;
+    const RUN_SPEED = 20;
+    const FLY_SPEED = 16;
+    const JUMP_VEL = 8;
+    const GRAVITY_ACC = -22;
+    const EYE_HEIGHT = 1.75;
+
+    // Player physics capsule (Rapier)
+    const PLAYER_RADIUS = 0.35;
+    const PLAYER_HALF_HEIGHT = 0.55; // half of cylinder part (excluding hemispheres)
+    const PLAYER_MASS = 70;
+
+    let velY = 0; // legacy fallback when Rapier not ready
+    let isGrounded = false;
+    const playerPos = new THREE.Vector3(0, 10, 0);
+
+    // Rapier player body/collider
+    let playerBody = null;
+    let playerCollider = null;
+    let lastJumpTime = 0;
+
+    // Robust terrain sampler - samples a small grid and returns max
+    // to handle slopes: we want the HIGHEST point under the player's feet
+    function sampleGround(x, z) {
+      const r = 0.3; // player foot radius
+      return Math.max(
+        getTerrainY(x, z),
+        getTerrainY(x + r, z),
+        getTerrainY(x - r, z),
+        getTerrainY(x, z + r),
+        getTerrainY(x, z - r)
+      );
+    }
+
+    let underwaterActive = false;
+    function updateWaterViewState() {
+      const lake = getLakeAtWater(playerPos.x, playerPos.z);
+      const isUnderwater = !!lake && playerPos.y < lake.level - 0.03;
+      if (isUnderwater === underwaterActive) return;
+
+      underwaterActive = isUnderwater;
+      if (underwaterActive) {
+        scene.background = UNDERWATER_BG_COLOR.clone();
+        scene.fog.color.copy(UNDERWATER_FOG_COLOR);
+        scene.fog.near = UNDERWATER_FOG_NEAR;
+        scene.fog.far = UNDERWATER_FOG_FAR;
+        renderer.toneMappingExposure = TONE_EXPOSURE * 0.9;
+        if (underwaterOverlay) underwaterOverlay.style.opacity = '1';
+      } else {
+        scene.background = SKY_BG_COLOR.clone();
+        scene.fog.color.copy(SKY_FOG_COLOR);
+        scene.fog.near = SKY_FOG_NEAR;
+        scene.fog.far = SKY_FOG_FAR;
+        renderer.toneMappingExposure = TONE_EXPOSURE;
+        if (underwaterOverlay) underwaterOverlay.style.opacity = '0';
+      }
+    }
+
+    // ============================================================
+    // ANIMATION LOOP
+    // ============================================================
+    let last = performance.now();
+    let renderFailureShown = false;
+    let renderInFlight = false;
+
+    function reportRenderFailure(err) {
+      if (renderFailureShown) return;
+      showWebGPUError('שגיאת רינדור WebGPU. בדוק תמיכה בדפדפן/דרייבר.');
+      console.error('WebGPU render failed:', err);
+      renderFailureShown = true;
+    }
+
+    function renderFrame() {
+      if (typeof renderer.renderAsync === 'function') {
+        if (renderInFlight) return;
+        renderInFlight = true;
+        renderer.renderAsync(scene, camera)
+          .catch(reportRenderFailure)
+          .finally(() => { renderInFlight = false; });
+        return;
+      }
+      if (typeof renderer.render === 'function') {
+        try {
+          renderer.render(scene, camera);
+        } catch (err) {
+          reportRenderFailure(err);
+        }
+        return;
+      }
+      reportRenderFailure(new TypeError('Renderer does not expose render/renderAsync'));
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const now = performance.now();
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+
+      if (started) {
+        const spd = keys['ShiftLeft'] || keys['ShiftRight'] ? RUN_SPEED : SPEED;
+        const fwdH = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        const rgtH = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+        if (flyMode) {
+          // ---- FLY MODE ---- (no collisions)
+          const fwd3 = new THREE.Vector3(
+            -Math.sin(yaw) * Math.cos(pitch),
+            Math.sin(pitch),
+            -Math.cos(yaw) * Math.cos(pitch)
+          );
+          const mv = new THREE.Vector3();
+          if (keys['KeyW'] || keys['ArrowUp']) mv.add(fwd3);
+          if (keys['KeyS'] || keys['ArrowDown']) mv.sub(fwd3);
+          if (keys['KeyA'] || keys['ArrowLeft']) mv.sub(rgtH);
+          if (keys['KeyD'] || keys['ArrowRight']) mv.add(rgtH);
+          if (keys['Space'] || keys['KeyE']) mv.y += 1;
+          if (keys['KeyQ']) mv.y -= 1;
+          if (mv.lengthSq() > 0) mv.normalize().multiplyScalar(FLY_SPEED * dt);
+          playerPos.add(mv);
+
+          // Keep Rapier body aligned if it exists
+          if (playerBody) {
+            const bodyY = playerPos.y - (EYE_HEIGHT - PLAYER_RADIUS);
+            if (typeof playerBody.setTranslation === 'function') {
+              playerBody.setTranslation({ x: playerPos.x, y: bodyY, z: playerPos.z }, true);
+            }
+            if (typeof playerBody.setLinvel === 'function') playerBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          }
+
+        } else {
+          // ---- WALK MODE ---- (Rapier-driven)
+          if (physWorld && playerBody) {
+            const mv = new THREE.Vector3();
+            if (keys['KeyW'] || keys['ArrowUp']) mv.add(fwdH);
+            if (keys['KeyS'] || keys['ArrowDown']) mv.sub(fwdH);
+            if (keys['KeyA'] || keys['ArrowLeft']) mv.sub(rgtH);
+            if (keys['KeyD'] || keys['ArrowRight']) mv.add(rgtH);
+            if (mv.lengthSq() > 0) mv.normalize();
+
+            // Check if player is in water
+            const playerLake = getLakeAtWater(playerPos.x, playerPos.z);
+            const inWater = playerLake && playerPos.y < playerLake.level;
+            const waterSpeedMult = inWater ? 0.5 : 1.0;  // Slower in water
+            const actualSpd = spd * waterSpeedMult;
+
+            // Ground check via raycast
+            const origin = playerBody.translation();
+            const ray = new RAPIER.Ray({ x: origin.x, y: origin.y, z: origin.z }, { x: 0, y: -1, z: 0 });
+            const maxToi = PLAYER_HALF_HEIGHT + PLAYER_RADIUS + 0.12;
+            const hit = physWorld.castRay(ray, maxToi, true);
+            isGrounded = !!hit;
+
+            const cur = playerBody.linvel();
+            const desired = { x: mv.x * actualSpd, y: cur.y, z: mv.z * actualSpd };
+
+            // Jump (weaker in water)
+            if (keys['Space'] && isGrounded && (now - lastJumpTime) > 250) {
+              desired.y = inWater ? JUMP_VEL * 0.5 : JUMP_VEL;
+              lastJumpTime = now;
+            }
+
+            // Swim up in water
+            if (inWater && keys['Space']) {
+              desired.y = Math.max(desired.y, 4);
+            }
+
+            if (typeof playerBody.setLinvel === 'function') {
+              playerBody.setLinvel(desired, true);
+            } else if (typeof playerBody.setLinearVelocity === 'function') {
+              playerBody.setLinearVelocity(desired, true);
+            }
+
+          } else {
+            // Fallback old movement
+            const mv = new THREE.Vector3();
+            if (keys['KeyW'] || keys['ArrowUp']) mv.add(fwdH);
+            if (keys['KeyS'] || keys['ArrowDown']) mv.sub(fwdH);
+            if (keys['KeyA'] || keys['ArrowLeft']) mv.sub(rgtH);
+            if (keys['KeyD'] || keys['ArrowRight']) mv.add(rgtH);
+            if (mv.lengthSq() > 0) mv.normalize().multiplyScalar(spd * dt);
+            playerPos.x += mv.x;
+            playerPos.z += mv.z;
+
+            const groundY = sampleGround(playerPos.x, playerPos.z) + EYE_HEIGHT;
+            velY += GRAVITY_ACC * dt;
+            playerPos.y += velY * dt;
+            if (playerPos.y < groundY) {
+              playerPos.y = groundY;
+              isGrounded = true;
+              velY = 0;
+            } else {
+              isGrounded = false;
+            }
+            if (keys['Space'] && isGrounded) {
+              velY = JUMP_VEL;
+              isGrounded = false;
+            }
+          }
+        }
+      }
+
+      camera.position.copy(playerPos);
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = yaw;
+      camera.rotation.x = pitch;
+      updateWaterViewState();
+
+      document.getElementById('ui').textContent = flyMode
+        ? '🕊️ מצב טיסה — F לביטול | E/Space עלה | Q רד'
+        : (isLocked ? '🌿 Lowpoly World — ESC לשחרר עכבר' : '🌿 לחץ להנעלת עכבר');
+
+      updateChunks(playerPos.x, playerPos.z);
+
+      for (const b of birds) {
+        b.userData.t += dt;
+        const d = b.userData;
+        d.angle += d.speed;
+        const tx = playerPos.x + Math.cos(d.angle) * d.rad;
+        const tz = playerPos.z + Math.sin(d.angle) * d.rad;
+        b.position.x += (tx - b.position.x) * 0.01;
+        b.position.z += (tz - b.position.z) * 0.01;
+        b.position.y = d.height + Math.sin(d.t * 0.7) * 3;
+        b.lookAt(b.position.x + Math.cos(d.angle + Math.PI / 2), b.position.y, b.position.z + Math.sin(d.angle + Math.PI / 2));
+        const fa = Math.sin(d.t * d.flapSpeed) * d.flapAmp;
+        b.children[0].rotation.z = Math.PI / 2 + fa;
+        b.children[1].rotation.z = -Math.PI / 2 - fa;
+      }
+
+      // Animate dancing balls in starting lake
+      const animTime = performance.now() / 1000;
+      animateDancingBalls(animTime, dt);
+
+      // Update foam system (splash + waterline foam)
+      updateFoamSystem(dt);
+
+      // Sun and shadows are completely fixed in world space - no movement
+      // Sun disc and glow positions are set once at initialization
+
+      // Step physics
+      stepPhysics(dt);
+
+      renderFrame();
+    }
+
+    // ============================================================
+    // RAPIER PHYSICS - loaded via dynamic ESM import
+    // ============================================================
+    let RAPIER = null;
+    let physWorld = null;
+    const rigidBodies = []; // {mesh, body}
+    const projectiles = []; // {mesh, body, born}
+
+    // Terrain colliders per chunk (static) so bullets don't fall through visual ground
+    const terrainColliders = new Map(); // key -> RAPIER.Collider
+
+    // Static colliders for decorations (trees/rocks/bushes) so projectiles/blocks collide with them.
+    // For performance and simplicity these are fixed colliders (no rigid bodies).
+    const decorationColliders = []; // RAPIER.Collider[]
+    let decorationsDirty = false;
+
+    // map from Three.js mesh -> rigid body for easy lookup
+    const meshToBody = new Map();
+
+    async function loadRapier() {
+      // jsdelivr ESM URL for rapier3d-compat 0.14.0 (stable, widely cached)
+      const R = await import('https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/rapier.es.js');
+      await R.init();
+      RAPIER = R;
+
+      // Create world
+      physWorld = new RAPIER.World({ x: 0, y: -25, z: 0 });
+
+      // NOTE:
+      // We intentionally don't use a single flat ground plane.
+      // Instead, each rendered terrain chunk gets its own static collider,
+      // matching the visual mesh so projectiles don't fall through.
+
+      console.log('✓ Rapier physics ready');
+
+      // Create colliders for decorations already created before Rapier loaded
+      clearDecorationColliders();
+      for (const [, grp] of objects) addDecorationCollidersFromGroup(grp);
+
+      initPlayerPhysics();
+
+      buildTower();
+
+      // Add physics to dancing balls after Rapier is loaded
+      addDancingBallsPhysics();
+    }
+
+    function addPhysicsBox(mesh, hw, hh, hd, mass) {
+      const t = mesh.position;
+      const q = mesh.quaternion;
+      let bodyDesc = mass === 0
+        ? RAPIER.RigidBodyDesc.fixed()
+        : RAPIER.RigidBodyDesc.dynamic();
+      bodyDesc.setTranslation(t.x, t.y, t.z);
+      bodyDesc.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+
+      // Extra damping helps stacks settle instead of jittering/drifting.
+      if (mass !== 0) {
+        if (typeof bodyDesc.setLinearDamping === 'function') bodyDesc.setLinearDamping(0.15);
+        if (typeof bodyDesc.setAngularDamping === 'function') bodyDesc.setAngularDamping(0.25);
+      }
+
+      const body = physWorld.createRigidBody(bodyDesc);
+      const colDesc = RAPIER.ColliderDesc.cuboid(hw, hh, hd)
+        .setRestitution(0.05)
+        .setFriction(0.9);
+      physWorld.createCollider(colDesc, body);
+      rigidBodies.push({ mesh, body });
+      meshToBody.set(mesh, body);
+      return body;
+    }
+
+    function addPhysicsSphere(mesh, r, mass) {
+      const t = mesh.position;
+      const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(t.x, t.y, t.z);
+      const body = physWorld.createRigidBody(bodyDesc);
+
+      // Apply mass by setting density (Rapier uses collider density to derive mass).
+      // Without this, bullets can feel like they "drop" immediately due to being too light.
+      const density = Math.max(0.1, mass); // treat 'mass' as density-like scalar
+      const colDesc = RAPIER.ColliderDesc.ball(r)
+        .setDensity(density)
+        .setRestitution(0.35)
+        .setFriction(0.4);
+
+      physWorld.createCollider(colDesc, body);
+      rigidBodies.push({ mesh, body });
+      return body;
+    }
+
+    function clearDecorationColliders() {
+      if (!physWorld) return;
+      for (const c of decorationColliders) {
+        physWorld.removeCollider(c, true);
+      }
+      decorationColliders.length = 0;
+    }
+
+    function addDecorationCollidersFromGroup(group) {
+      if (!physWorld || !RAPIER || !group) return;
+
+      // Simple & fast: approximate each mesh in the decoration group with an oriented bounding box collider.
+      // This is not perfect but gives solid physical interaction.
+      const meshes = [];
+      group.traverse(obj => { if (obj && obj.isMesh) meshes.push(obj); });
+
+      for (const m of meshes) {
+        const geo = m.geometry;
+        if (!geo) continue;
+        if (!geo.boundingBox) geo.computeBoundingBox();
+        const bb = geo.boundingBox;
+        if (!bb) continue;
+
+        const size = new THREE.Vector3();
+        bb.getSize(size);
+        const center = new THREE.Vector3();
+        bb.getCenter(center);
+
+        // World transform
+        const worldPos = new THREE.Vector3();
+        m.getWorldPosition(worldPos);
+        const worldQuat = new THREE.Quaternion();
+        m.getWorldQuaternion(worldQuat);
+
+        // Bounding box center in world space
+        const worldCenter = center.clone().applyQuaternion(worldQuat).add(worldPos);
+
+        // Use scaled half-extents (avoid zeros)
+        const sx = m.scale.x || 1, sy = m.scale.y || 1, sz = m.scale.z || 1;
+        const hx = Math.max(0.05, size.x * 0.5 * sx);
+        const hy = Math.max(0.05, size.y * 0.5 * sy);
+        const hz = Math.max(0.05, size.z * 0.5 * sz);
+
+        const colDesc = RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+          .setTranslation(worldCenter.x, worldCenter.y, worldCenter.z)
+          .setRotation({ x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w })
+          .setRestitution(0.05)
+          .setFriction(0.9);
+
+        const col = physWorld.createCollider(colDesc);
+        decorationColliders.push(col);
+      }
+    }
+
+    function buildTower() {
+      if (!RAPIER) return;
+      // Remove old
+      for (const rb of rigidBodies) { scene.remove(rb.mesh); physWorld.removeRigidBody(rb.body); }
+      rigidBodies.length = 0;
+      for (const p of projectiles) scene.remove(p.mesh);
+      projectiles.length = 0;
+      meshToBody.clear();
+
+      // Ensure colliders exist for currently visible chunks (Rapier may load after terrain render)
+      for (const [key, mesh] of chunks) {
+        if (terrainColliders.has(key)) continue;
+        const geo = mesh.geometry;
+        const parts = key.split(',').map(Number);
+        const cx = parts[0], cz = parts[1];
+        const ox = cx * CHUNK_SIZE, oz = cz * CHUNK_SIZE;
+
+        if (physWorld && RAPIER) {
+          const posAttr = geo.getAttribute('position');
+          const idxAttr = geo.index;
+
+          const verts = new Float32Array(posAttr.count * 3);
+          for (let i = 0; i < posAttr.count; i++) {
+            verts[i * 3 + 0] = posAttr.getX(i);
+            verts[i * 3 + 1] = posAttr.getY(i);
+            verts[i * 3 + 2] = posAttr.getZ(i);
+          }
+
+          let indices;
+          if (idxAttr) {
+            indices = new Uint32Array(idxAttr.count);
+            for (let i = 0; i < idxAttr.count; i++) indices[i] = idxAttr.getX(i);
+          } else {
+            indices = new Uint32Array(posAttr.count);
+            for (let i = 0; i < posAttr.count; i++) indices[i] = i;
+          }
+
+          const colDesc = RAPIER.ColliderDesc.trimesh(verts, indices)
+            .setTranslation(ox, 0, oz)
+            .setRestitution(0.0)
+            .setFriction(0.9);
+          const collider = physWorld.createCollider(colDesc);
+          terrainColliders.set(key, collider);
+        }
+      }
+
+      // Place tower in front of player
+      const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const gx = playerPos.x + fwd.x * 14;
+      const gz = playerPos.z + fwd.z * 14;
+      const gy = sampleGround(gx, gz);
+
+      // Ground slab under tower (static)
+      // Use a LEVEL foundation so the stack starts stable even if the terrain below is sloped.
+      const SLAB_CLEARANCE = 0.55;
+      const slabGeo = new THREE.BoxGeometry(12, 0.5, 6);
+      const slabMat = new THREE.MeshPhongMaterial({ color: 0x8a7060, flatShading: true });
+      const slabMesh = new THREE.Mesh(slabGeo, slabMat);
+      slabMesh.receiveShadow = true;
+      slabMesh.castShadow = true;
+      slabMesh.position.set(gx, gy + 0.25 + SLAB_CLEARANCE, gz);
+      slabMesh.rotation.set(0, 0, 0);
+      scene.add(slabMesh);
+      addPhysicsBox(slabMesh, 6, 0.25, 3, 0); // static
+
+      // Colored blocks
+      const bw = 0.6, bh = 0.6, bd = 0.6;
+      const wide = 4, tall = 7;
+      const BLOCK_CLEARANCE = 0.28;
+      const cols = [0xe74c3c, 0xe67e22, 0xf1c40f, 0x2ecc71, 0x3498db, 0x9b59b6, 0x1abc9c, 0xe91e63];
+      for (let row = 0; row < tall; row++) {
+        for (let col = 0; col < wide; col++) {
+          const wx = gx + (col - (wide - 1) / 2) * (bw * 2 + 0.05);
+          const wy = gy + 0.3 + bh + row * (bh * 2 + 0.01) + SLAB_CLEARANCE + BLOCK_CLEARANCE;
+          const color = cols[(row * wide + col) % cols.length];
+          const geo = new THREE.BoxGeometry(bw * 2, bh * 2, bd * 2);
+          const mat = new THREE.MeshPhongMaterial({ color, flatShading: true, shininess: 8 });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.castShadow = mesh.receiveShadow = true;
+          mesh.position.set(wx, wy, gz);
+          scene.add(mesh);
+          addPhysicsBox(mesh, bw, bh, bd, 3);
+        }
+      }
+      console.log('✓ Tower built:', rigidBodies.length, 'bodies');
+    }
+
+    function shoot() {
+      if (!RAPIER || !isLocked) return;
+
+      const R = 0.25;
+      const MUZZLE_SPEED = 65; // higher speed so it clearly goes forward
+
+      // Direction from camera (includes pitch)
+      const dir = new THREE.Vector3(
+        -Math.sin(yaw) * Math.cos(pitch),
+        Math.sin(pitch),
+        -Math.cos(yaw) * Math.cos(pitch)
+      ).normalize();
+
+      // Spawn slightly in front of the camera, and not intersecting the player/ground
+      const sp = camera.getWorldPosition(new THREE.Vector3())
+        .addScaledVector(dir, 2.2);
+
+      const geo = new THREE.SphereGeometry(R, 10, 7);
+      const mat = new THREE.MeshPhongMaterial({ color: 0x1a1a2e, flatShading: true, shininess: 60 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.position.copy(sp);
+      scene.add(mesh);
+
+      const body = addPhysicsSphere(mesh, R, 4);
+
+      // Ensure it doesn't start "asleep" and add a small upward bias so it doesn't feel like it drops from you
+      // Rapier JS API differs between builds. Support both:
+      // - setLinvel({x,y,z}, wakeUp)
+      // - setLinearVelocity({x,y,z}, wakeUp)
+      // Also wake explicitly where supported.
+      const linvel = {
+        x: dir.x * MUZZLE_SPEED,
+        y: (dir.y + 0.03) * MUZZLE_SPEED,
+        z: dir.z * MUZZLE_SPEED,
       };
-      
-      if(typeof rb.body.setLinvel === 'function') {
-        rb.body.setLinvel(newVel, false);
+
+      if (typeof body.wakeUp === 'function') body.wakeUp();
+
+      if (typeof body.setLinvel === 'function') {
+        body.setLinvel(linvel, true);
+      } else if (typeof body.setLinearVelocity === 'function') {
+        body.setLinearVelocity(linvel, true);
+      } else {
+        console.warn('RigidBody has no linear-velocity setter. Available keys:', Object.keys(body));
       }
-    }
-  }
 
-  // Apply water physics to projectiles
-  for(const p of projectiles) {
-    const t = p.body.translation();
-    const lake = getLakeAtWater(t.x, t.z);
-    
-    if(lake && t.y < lake.level) {
-      // Object is in water - apply drag and buoyancy
-      const vel = p.body.linvel();
-      const waterDrag = 0.92;  // Slow down in water
-      const buoyancy = 2.5;    // Upward force
-      
-      // Apply water drag (slow down horizontal movement)
-      const newVel = {
-        x: vel.x * waterDrag,
-        y: vel.y * waterDrag + buoyancy * dt,  // Buoyancy pushes up
-        z: vel.z * waterDrag
-      };
-      
-      if(typeof p.body.setLinvel === 'function') {
-        p.body.setLinvel(newVel, false);
+      // High CCD for fast projectile
+      if (typeof body.enableCcd === 'function') body.enableCcd(true);
+
+      projectiles.push({ mesh, body, born: performance.now() });
+    }
+
+    // Sync Three.js meshes with Rapier body transforms
+    function stepPhysics(dt) {
+      if (!physWorld) return;
+
+      // Rebuild decoration colliders in a controlled place (once) if chunks changed.
+      if (decorationsDirty) {
+        decorationsDirty = false;
+        clearDecorationColliders();
+        for (const [, g] of objects) addDecorationCollidersFromGroup(g);
       }
-      
-      // Change projectile color when in water
-      if(p.mesh.material.color.getHex() !== 0x1a4a6e) {
-        p.mesh.material.color.setHex(0x1a4a6e);
+      physWorld.timestep = dt;
+      physWorld.step();
+
+      // Apply water physics to all rigid bodies
+      for (const rb of rigidBodies) {
+        if (rb.body.isFixed()) continue;
+        const t = rb.body.translation();
+        const r = rb.body.rotation();
+        rb.mesh.position.set(t.x, t.y, t.z);
+        rb.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+
+        // Check if in water
+        const lake = getLakeAtWater(t.x, t.z);
+        if (lake && t.y < lake.level) {
+          const vel = rb.body.linvel();
+          const waterDrag = 0.88;
+          const buoyancy = 3.5;
+
+          const newVel = {
+            x: vel.x * waterDrag,
+            y: vel.y * waterDrag + buoyancy * dt,
+            z: vel.z * waterDrag
+          };
+
+          if (typeof rb.body.setLinvel === 'function') {
+            rb.body.setLinvel(newVel, false);
+          }
+        }
       }
+
+      // Apply water physics to projectiles
+      for (const p of projectiles) {
+        const t = p.body.translation();
+        const lake = getLakeAtWater(t.x, t.z);
+
+        if (lake && t.y < lake.level) {
+          // Object is in water - apply drag and buoyancy
+          const vel = p.body.linvel();
+          const waterDrag = 0.92;  // Slow down in water
+          const buoyancy = 2.5;    // Upward force
+
+          // Apply water drag (slow down horizontal movement)
+          const newVel = {
+            x: vel.x * waterDrag,
+            y: vel.y * waterDrag + buoyancy * dt,  // Buoyancy pushes up
+            z: vel.z * waterDrag
+          };
+
+          if (typeof p.body.setLinvel === 'function') {
+            p.body.setLinvel(newVel, false);
+          }
+
+          // Change projectile color when in water
+          if (p.mesh.material.color.getHex() !== 0x1a4a6e) {
+            p.mesh.material.color.setHex(0x1a4a6e);
+          }
+        }
+      }
+
+      // Sync player camera position from Rapier body
+      if (playerBody) {
+        const tp = playerBody.translation();
+        // Body translation is capsule center; playerPos is eye position.
+        playerPos.set(tp.x, tp.y + (EYE_HEIGHT - PLAYER_RADIUS), tp.z);
+      }
+
+      // Projectiles are kept (no auto-despawn).
+      // Note: Keeping unlimited bodies forever can eventually hurt performance.
+      // If you ever want a limit, we can keep the last N projectiles instead.
     }
-  }
+    // ============================================================
+    // BOOT
+    // ============================================================
+    updateChunks(0, 0);
+    const startH = getTerrainY(0, 0) + EYE_HEIGHT + 1;
+    playerPos.set(0, startH, 0);
+    updateWaterViewState();
 
-  // Sync player camera position from Rapier body
-  if(playerBody) {
-    const tp = playerBody.translation();
-    // Body translation is capsule center; playerPos is eye position.
-    playerPos.set(tp.x, tp.y + (EYE_HEIGHT - PLAYER_RADIUS), tp.z);
-  }
+    // Create dancing balls in starting lake after chunks are loaded
+    createDancingBalls();
 
-  // Projectiles are kept (no auto-despawn).
-  // Note: Keeping unlimited bodies forever can eventually hurt performance.
-  // If you ever want a limit, we can keep the last N projectiles instead.
-}
-// ============================================================
-// BOOT
-// ============================================================
-updateChunks(0, 0);
-const startH = getTerrainY(0,0) + EYE_HEIGHT + 1;
-playerPos.set(0, startH, 0);
-updateWaterViewState();
+    // Shoot on left click
+    renderer.domElement.addEventListener('mousedown', e => {
+      if (!started || !isLocked) return;
+      if (e.button === 0) shoot();
+    });
 
-// Create dancing balls in starting lake after chunks are loaded
-createDancingBalls();
+    // R = rebuild tower
+    document.addEventListener('keydown', e => {
+      if (e.code === 'KeyR') buildTower();
+    });
 
-// Shoot on left click
-renderer.domElement.addEventListener('mousedown', e => {
-  if(!started || !isLocked) return;
-  if(e.button === 0) shoot();
-});
+    // Load Rapier and build tower
+    function initPlayerPhysics() {
+      if (!physWorld || !RAPIER) return;
 
-// R = rebuild tower
-document.addEventListener('keydown', e => {
-  if(e.code === 'KeyR') buildTower();
-});
+      // Remove old player if any
+      if (playerBody) {
+        physWorld.removeRigidBody(playerBody);
+        playerBody = null;
+        playerCollider = null;
+      }
 
-// Load Rapier and build tower
-function initPlayerPhysics() {
-  if(!physWorld || !RAPIER) return;
+      const start = playerPos.clone();
+      const bodyY = start.y - (EYE_HEIGHT - PLAYER_RADIUS);
 
-  // Remove old player if any
-  if(playerBody) {
-    physWorld.removeRigidBody(playerBody);
-    playerBody = null;
-    playerCollider = null;
-  }
+      const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(start.x, bodyY, start.z);
 
-  const start = playerPos.clone();
-  const bodyY = start.y - (EYE_HEIGHT - PLAYER_RADIUS);
+      // Prevent tipping over
+      if (typeof bodyDesc.lockRotations === 'function') bodyDesc.lockRotations();
 
-  const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(start.x, bodyY, start.z);
+      // Damping for stable character control
+      if (typeof bodyDesc.setLinearDamping === 'function') bodyDesc.setLinearDamping(4.0);
+      if (typeof bodyDesc.setAngularDamping === 'function') bodyDesc.setAngularDamping(4.0);
 
-  // Prevent tipping over
-  if(typeof bodyDesc.lockRotations === 'function') bodyDesc.lockRotations();
+      playerBody = physWorld.createRigidBody(bodyDesc);
 
-  // Damping for stable character control
-  if(typeof bodyDesc.setLinearDamping === 'function') bodyDesc.setLinearDamping(4.0);
-  if(typeof bodyDesc.setAngularDamping === 'function') bodyDesc.setAngularDamping(4.0);
+      // Collider
+      let colDesc;
+      if (RAPIER.ColliderDesc.capsule) {
+        colDesc = RAPIER.ColliderDesc.capsule(PLAYER_HALF_HEIGHT, PLAYER_RADIUS);
+      } else {
+        // Fallback
+        colDesc = RAPIER.ColliderDesc.ball(PLAYER_RADIUS);
+      }
 
-  playerBody = physWorld.createRigidBody(bodyDesc);
-
-  // Collider
-  let colDesc;
-  if(RAPIER.ColliderDesc.capsule) {
-    colDesc = RAPIER.ColliderDesc.capsule(PLAYER_HALF_HEIGHT, PLAYER_RADIUS);
-  } else {
-    // Fallback
-    colDesc = RAPIER.ColliderDesc.ball(PLAYER_RADIUS);
-  }
-
-  colDesc.setFriction(0.0).setRestitution(0.0);
-  playerCollider = physWorld.createCollider(colDesc, playerBody);
-}
-
-loadRapier().catch(err => console.error('Rapier load failed:', err));
-
-window.render_game_to_text = () => JSON.stringify({
-  mode: started ? (flyMode ? 'fly' : 'walk') : 'menu',
-  controlsLocked: isLocked,
-  player: {
-    x: Number(playerPos.x.toFixed(2)),
-    y: Number(playerPos.y.toFixed(2)),
-    z: Number(playerPos.z.toFixed(2)),
-    yaw: Number(yaw.toFixed(3)),
-    pitch: Number(pitch.toFixed(3))
-  },
-  nearby: {
-    loadedChunks: chunks.size,
-    rigidBodies: rigidBodies.length,
-    projectiles: projectiles.length,
-    lakes: lakes.size,
-    birds: birds.length
-  },
-  coordinateSystem: 'Right-handed; +X right, +Y up, +Z toward south (camera looks to -Z by default).'
-});
-
-window.advanceTime = (ms = 16.67) => {
-  const dt = Math.min(Math.max(ms, 1) / 1000, 0.05);
-  stepPhysics(dt);
-  updateChunks(playerPos.x, playerPos.z);
-  camera.position.copy(playerPos);
-  camera.rotation.order = 'YXZ';
-  camera.rotation.y = yaw;
-  camera.rotation.x = pitch;
-  updateWaterViewState();
-  renderFrame();
-};
-
-async function boot() {
-  try {
-    if (typeof renderer.init === 'function') {
-      await renderer.init();
+      colDesc.setFriction(0.0).setRestitution(0.0);
+      playerCollider = physWorld.createCollider(colDesc, playerBody);
     }
-  } catch (err) {
-    showWebGPUError('נכשל אתחול WebGPU. הרץ דרך localhost/https ונסה דרייבר/דפדפן עדכני.');
-    console.error('WebGPU init failed:', err);
-    return;
-  }
-  animate();
-}
 
-boot();
-</script>
+    loadRapier().catch(err => console.error('Rapier load failed:', err));
+
+    window.render_game_to_text = () => JSON.stringify({
+      mode: started ? (flyMode ? 'fly' : 'walk') : 'menu',
+      controlsLocked: isLocked,
+      player: {
+        x: Number(playerPos.x.toFixed(2)),
+        y: Number(playerPos.y.toFixed(2)),
+        z: Number(playerPos.z.toFixed(2)),
+        yaw: Number(yaw.toFixed(3)),
+        pitch: Number(pitch.toFixed(3))
+      },
+      nearby: {
+        loadedChunks: chunks.size,
+        rigidBodies: rigidBodies.length,
+        projectiles: projectiles.length,
+        lakes: lakes.size,
+        birds: birds.length
+      },
+      coordinateSystem: 'Right-handed; +X right, +Y up, +Z toward south (camera looks to -Z by default).'
+    });
+
+    window.advanceTime = (ms = 16.67) => {
+      const dt = Math.min(Math.max(ms, 1) / 1000, 0.05);
+      stepPhysics(dt);
+      updateChunks(playerPos.x, playerPos.z);
+      camera.position.copy(playerPos);
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = yaw;
+      camera.rotation.x = pitch;
+      updateWaterViewState();
+      renderFrame();
+    };
+
+    async function boot() {
+      try {
+        if (typeof renderer.init === 'function') {
+          await renderer.init();
+        }
+      } catch (err) {
+        showWebGPUError('נכשל אתחול WebGPU. הרץ דרך localhost/https ונסה דרייבר/דפדפן עדכני.');
+        console.error('WebGPU init failed:', err);
+        return;
+      }
+      animate();
+    }
+
+    boot();
+  </script>
 </body>
+
 </html>
