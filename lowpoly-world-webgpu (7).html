@@ -191,6 +191,13 @@
     <div class="subtitle">לחץ כדי לנעול עכבר ולהתחיל</div>
   </div>
   <div id="ui">🌿 Lowpoly World</div>
+  <div id="weather-status" style="
+    position:fixed; top:60px; left:50%; transform:translateX(-50%);
+    color:rgba(255,255,255,0.9); text-shadow:0 2px 6px rgba(0,0,0,0.6);
+    font-family:'Segoe UI',sans-serif; font-size:15px; pointer-events:none;
+    background:rgba(0,0,0,0.22); padding:5px 14px; border-radius:14px;
+    backdrop-filter:blur(4px); display:none; transition:opacity 0.5s;
+  "></div>
   <div id="crosshair"></div>
   <div id="instructions">
     <b>Movement:</b> WASD<br>
@@ -249,7 +256,6 @@
       </div>
     </div>
   </div>
-
   <div id="underwater-overlay"></div>
 
   <script type="importmap">
@@ -279,11 +285,7 @@
       time,
       triplanarTexture,
       texture,
-      normalWorld,
-      pointUV,
-      distance,
-      float,
-      uniform
+      normalWorld
     } from 'three/tsl';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -1525,69 +1527,9 @@
     scene.add(starsSystem);
 
     // ============================================================
-    // WEATHER SYSTEM
+    // WEATHER SYSTEM - IMPROVED
     // ============================================================
     let currentWeatherType = 'Clear'; // 'Clear', 'Snow', 'Rain', 'Wind'
-
-    // 1. SNOW SYSTEM (Points with TSL Circular Mask)
-    const snowGeo = new THREE.BufferGeometry();
-    const snowCount = 10000;
-    const snowPositions = new Float32Array(snowCount * 3);
-    const snowVelocities = new Float32Array(snowCount * 3);
-    const snowDrift = new Float32Array(snowCount * 3); 
-    for (let i = 0; i < snowCount; i++) {
-      snowPositions[i * 3] = (Math.random() - 0.5) * 150;
-      snowPositions[i * 3 + 1] = -20 + Math.random() * 110;
-      snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 150;
-      
-      snowDrift[i * 3] = (Math.random() - 0.5) * 2;
-      snowDrift[i * 3 + 1] = -1.5 - Math.random() * 1.5;
-      snowDrift[i * 3 + 2] = (Math.random() - 0.5) * 2;
-    }
-    snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPositions, 3));
-    
-    const snowMat = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 2.5, // Slightly larger for better circle visibility
-      transparent: true,
-      depthWrite: false,
-      depthTest: true,
-      sizeAttenuation: true
-    });
-    
-    // TSL Circle Mask for Snowflakes with dynamic intensity
-    const snowIntensityNode = uniform(0.0);
-    const dist = distance(pointUV, vec2(0.5));
-    snowMat.opacityNode = snowIntensityNode.mul(dist.smoothstep(0.5, 0.4)); // Soft circle + faded by intensity
-    
-    const snowSystem = new THREE.Points(snowGeo, snowMat);
-    snowSystem.frustumCulled = false;
-    scene.add(snowSystem);
-
-    // 2. RAIN SYSTEM (LineSegments for streaks)
-    const rainGeo = new THREE.BufferGeometry();
-    const rainCount = 10000; // 10,000 lines = 20,000 vertices
-    const rainPositions = new Float32Array(rainCount * 2 * 3); // 2 verts per line
-    const rainVelocities = new Float32Array(rainCount * 3);    // 1 velocity per line
-    for (let i = 0; i < rainCount; i++) {
-      const x = (Math.random() - 0.5) * 150;
-      const y = 10 + Math.random() * 90;
-      const z = (Math.random() - 0.5) * 150;
-      rainPositions[i * 6] = x; rainPositions[i * 6 + 1] = y; rainPositions[i * 6 + 2] = z; // Start
-      rainPositions[i * 6 + 3] = x; rainPositions[i * 6 + 4] = y - 1; rainPositions[i * 6 + 5] = z; // End
-      rainVelocities[i * 3] = 0; rainVelocities[i * 3 + 1] = 0; rainVelocities[i * 3 + 2] = 0;
-    }
-    rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
-    const rainMat = new THREE.LineBasicMaterial({
-      color: 0xaaaaaa,
-      transparent: true,
-      opacity: 0.0,
-      depthWrite: false,
-      depthTest: true
-    });
-    const rainSystem = new THREE.LineSegments(rainGeo, rainMat);
-    rainSystem.frustumCulled = false;
-    scene.add(rainSystem);
 
     // Weather State Variables
     let currentPrecipitation = 0;
@@ -1602,126 +1544,782 @@
       const t = performance.now() / 10000;
       const angle = t % (Math.PI * 2);
       windVector.set(
-        Math.cos(angle) * windStrength * 15, // strong horizontal force
+        Math.cos(angle) * windStrength * 15,
         0,
         Math.sin(angle) * windStrength * 15
       );
     }
 
-    function setWeatherState() {
-      // Apply wind strength
-      updateWindVector();
-      const intensityScale = currentPrecipitation / 100;
-      
-      // Toggle visibility and opacity (SAFE for UI thread)
-      snowMat.opacity = 0;
-      rainMat.opacity = 0;
-      snowSystem.visible = false;
-      rainSystem.visible = false;
+    // ── RAIN: LineSegments (streaks) ──────────────────────────────
+    const RAIN_COUNT = 6000;
+    const rainPositions = new Float32Array(RAIN_COUNT * 6); // 2 pts per line
+    const rainVelocities = new Float32Array(RAIN_COUNT * 3);
+    const rainGeo = new THREE.BufferGeometry();
 
-      if (currentWeatherType === 'Snow') {
-        snowSystem.visible = true;
-        snowIntensityNode.value = 0.8 * intensityScale;
-      } else if (currentWeatherType === 'Rain' || currentWeatherType === 'Wind') {
-        rainSystem.visible = true;
-        rainMat.opacity = (currentWeatherType === 'Rain' ? 0.6 : 0.8) * intensityScale;
-        rainMat.color.setHex(currentWeatherType === 'Rain' ? 0xaaaaaa : (currentSeason === 'Autumn' ? 0xd35400 : 0xffb6c1));
+    function initRainParticle(i) {
+      const x = (Math.random() - 0.5) * 160;
+      const y = 20 + Math.random() * 50;
+      const z = (Math.random() - 0.5) * 160;
+      rainPositions[i * 6 + 0] = x;
+      rainPositions[i * 6 + 1] = y;
+      rainPositions[i * 6 + 2] = z;
+      const len = 1.0 + Math.random() * 0.8; // streak length (longer = faster look)
+      rainPositions[i * 6 + 3] = x + (windVector.x || 0) * 0.04 * len;
+      rainPositions[i * 6 + 4] = y - len;
+      rainPositions[i * 6 + 5] = z + (windVector.z || 0) * 0.04 * len;
+      rainVelocities[i * 3 + 0] = (Math.random() - 0.5) * 0.5;
+      rainVelocities[i * 3 + 1] = -(22 + Math.random() * 12);
+      rainVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
+    }
+
+    for (let i = 0; i < RAIN_COUNT; i++) initRainParticle(i);
+    rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+    const rainIndices = [];
+    for (let i = 0; i < RAIN_COUNT; i++) { rainIndices.push(i * 2, i * 2 + 1); }
+    rainGeo.setIndex(rainIndices);
+
+    const rainMat = new THREE.LineBasicMaterial({
+      color: 0xaac8e0,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      vertexColors: false,
+    });
+    const rainSystem = new THREE.LineSegments(rainGeo, rainMat);
+    rainSystem.frustumCulled = false;
+    scene.add(rainSystem);
+
+    // ── SNOW: InstancedMesh – single draw call, zero freezing ─────
+    // Each flake is a tiny flat disc (PlaneGeometry) instanced 2000 times.
+    // One shared material → no per-sprite overhead → no freezing.
+    const SNOW_COUNT = 2000;
+    const snowPositions  = new Float32Array(SNOW_COUNT * 3);
+    const snowVelocities = new Float32Array(SNOW_COUNT * 3);
+    const snowPhases     = new Float32Array(SNOW_COUNT);
+    const snowSizes      = new Float32Array(SNOW_COUNT);
+
+    for (let i = 0; i < SNOW_COUNT; i++) {
+      snowPositions[i * 3]     = (Math.random() - 0.5) * 140;
+      snowPositions[i * 3 + 1] = Math.random() * 50;
+      snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 140;
+      snowVelocities[i * 3]     = (Math.random() - 0.5) * 0.8;
+      snowVelocities[i * 3 + 1] = -(0.8 + Math.random() * 1.8);
+      snowVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.8;
+      snowPhases[i]  = Math.random() * Math.PI * 2;
+      snowSizes[i]   = 0.3 + Math.random() * 0.6; // per-flake size variation
+    }
+
+    // Shared disc geometry – circle, not square
+    const snowFlakeGeo = new THREE.CircleGeometry(0.5, 8); // 8-sided circle
+
+    // Canvas texture: white disc fading to transparent at edge
+    const _sfCanvas = document.createElement('canvas');
+    _sfCanvas.width = _sfCanvas.height = 32;
+    const _sfCtx = _sfCanvas.getContext('2d');
+    const _sfGrad = _sfCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    _sfGrad.addColorStop(0,   'rgba(255,255,255,1)');
+    _sfGrad.addColorStop(0.55,'rgba(240,248,255,0.85)');
+    _sfGrad.addColorStop(0.85,'rgba(220,238,255,0.4)');
+    _sfGrad.addColorStop(1,   'rgba(200,225,255,0)');
+    _sfCtx.fillStyle = _sfGrad;
+    _sfCtx.beginPath(); _sfCtx.arc(16,16,16,0,Math.PI*2); _sfCtx.fill();
+    const _sfTex = new THREE.CanvasTexture(_sfCanvas);
+
+    const snowMat = new THREE.MeshBasicMaterial({
+      map: _sfTex,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      side: THREE.DoubleSide,
+      alphaTest: 0.01,
+    });
+
+    const snowMesh = new THREE.InstancedMesh(snowFlakeGeo, snowMat, SNOW_COUNT);
+    snowMesh.frustumCulled = false;
+    snowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(snowMesh);
+
+    // Reusable objects to avoid GC pressure
+    const _snowMatrix  = new THREE.Matrix4();
+    const _snowPos     = new THREE.Vector3();
+    const _snowQuat    = new THREE.Quaternion();
+    const _snowScale   = new THREE.Vector3();
+
+    let snowOpacity = 0;
+    let snowTargetOpacity = 0;
+
+    // ============================================================
+    // 3D CLOUD SYSTEM  – puffs built from IcosahedronGeometry clusters
+    // Rain/Snow only falls UNDER clouds; clouds form first, then precip starts
+    // ============================================================
+
+    // ── Cloud puff texture: organic lumpy blob (NOT an ellipse) ──
+    // We paint multiple overlapping soft circles at random offsets to break ellipse look
+    function makeCloudPuffTexture(size = 192) {
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+
+      // Seed with a simple deterministic random to vary each call slightly
+      let _s = size * 31 + 7;
+      const rnd = () => { _s = (_s * 16807 + 0) % 2147483647; return (_s - 1) / 2147483646; };
+
+      // Big central blob
+      const cx = size * 0.5, cy = size * 0.58;
+      const blobs = [
+        { x: cx,                y: cy,                r: size * 0.36, a: 0.70 },
+        { x: cx - size * 0.20, y: cy + size * 0.04, r: size * 0.25, a: 0.60 },
+        { x: cx + size * 0.22, y: cy + size * 0.02, r: size * 0.26, a: 0.60 },
+        { x: cx - size * 0.06, y: cy - size * 0.16, r: size * 0.20, a: 0.55 },
+        { x: cx + size * 0.10, y: cy - size * 0.14, r: size * 0.18, a: 0.50 },
+        { x: cx - size * 0.30, y: cy + size * 0.10, r: size * 0.15, a: 0.40 },
+        { x: cx + size * 0.32, y: cy + size * 0.08, r: size * 0.14, a: 0.38 },
+        // extra tiny bumps for lumpiness
+        { x: cx - size * 0.14, y: cy - size * 0.22, r: size * 0.11, a: 0.30 },
+        { x: cx + size * 0.18, y: cy - size * 0.20, r: size * 0.10, a: 0.28 },
+      ];
+
+      for (const b of blobs) {
+        const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.05, b.x, b.y, b.r);
+        g.addColorStop(0.0, `rgba(255,255,255,${b.a.toFixed(2)})`);
+        g.addColorStop(0.45, `rgba(245,250,255,${(b.a * 0.55).toFixed(2)})`);
+        g.addColorStop(0.80, `rgba(230,240,255,${(b.a * 0.18).toFixed(2)})`);
+        g.addColorStop(1.0,  'rgba(220,235,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
       }
-      // NO needsUpdate here to avoid WebGPU racing
+      return new THREE.CanvasTexture(c);
+    }
+
+    // Storm cloud texture: same shape but darker / greyer
+    function makeStormPuffTexture(size = 192) {
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+      const cx = size * 0.5, cy = size * 0.55;
+      const blobs = [
+        { x: cx,                y: cy,                r: size * 0.38, a: 0.72 },
+        { x: cx - size * 0.22, y: cy + size * 0.05, r: size * 0.28, a: 0.62 },
+        { x: cx + size * 0.24, y: cy + size * 0.04, r: size * 0.27, a: 0.62 },
+        { x: cx - size * 0.04, y: cy - size * 0.18, r: size * 0.22, a: 0.56 },
+        { x: cx + size * 0.12, y: cy - size * 0.15, r: size * 0.19, a: 0.52 },
+        { x: cx - size * 0.32, y: cy + size * 0.12, r: size * 0.16, a: 0.42 },
+        { x: cx + size * 0.34, y: cy + size * 0.10, r: size * 0.15, a: 0.40 },
+        // flat dark base to look heavy / threatening
+        { x: cx,                y: cy + size * 0.25, r: size * 0.34, a: 0.45 },
+      ];
+      for (const b of blobs) {
+        const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.05, b.x, b.y, b.r);
+        g.addColorStop(0.0, `rgba(140,155,175,${b.a.toFixed(2)})`);
+        g.addColorStop(0.45, `rgba(120,135,155,${(b.a * 0.55).toFixed(2)})`);
+        g.addColorStop(0.82, `rgba(100,115,135,${(b.a * 0.18).toFixed(2)})`);
+        g.addColorStop(1.0,  'rgba(90,105,125,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    // Fog wisp texture: very soft, elongated, horizontal
+    function makeFogWispTexture(size = 192) {
+      const c = document.createElement('canvas');
+      c.width = size * 2; c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      const cx = c.width * 0.5, cy = c.height * 0.5;
+      const blobs = [
+        { x: cx,                    y: cy,                r: size * 0.38, rx: 1.9, a: 0.40 },
+        { x: cx - size * 0.45,     y: cy + size * 0.04, r: size * 0.28, rx: 1.5, a: 0.30 },
+        { x: cx + size * 0.48,     y: cy + size * 0.02, r: size * 0.26, rx: 1.4, a: 0.28 },
+        { x: cx,                    y: cy - size * 0.10, r: size * 0.22, rx: 1.6, a: 0.22 },
+      ];
+      for (const b of blobs) {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.scale(b.rx, 1);
+        const g = ctx.createRadialGradient(0, 0, b.r * 0.05, 0, 0, b.r);
+        g.addColorStop(0.0, `rgba(230,240,250,${b.a.toFixed(2)})`);
+        g.addColorStop(0.5, `rgba(215,228,242,${(b.a * 0.45).toFixed(2)})`);
+        g.addColorStop(1.0, 'rgba(200,218,235,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    const CLOUD_PUFF_TEX  = makeCloudPuffTexture(192);
+    const STORM_PUFF_TEX  = makeStormPuffTexture(192);
+    const FOG_WISP_TEX    = makeFogWispTexture(192);
+
+    // ── Build a single volumetric cloud from multiple overlapping puff sprites ──
+    function makeCloud3D(type = 'fair') {
+      const group = new THREE.Group();
+
+      // Config per type
+      const cfgMap = {
+        fair:  { puffs: 7 + Math.floor(Math.random() * 4),  minR: 12, maxR: 28, spreadX: 38, spreadY: 7,  spreadZ: 22, tex: CLOUD_PUFF_TEX,  baseOp: 0.82 },
+        storm: { puffs: 9 + Math.floor(Math.random() * 5),  minR: 14, maxR: 32, spreadX: 48, spreadY: 10, spreadZ: 28, tex: STORM_PUFF_TEX,  baseOp: 0.90 },
+        fog:   { puffs: 5 + Math.floor(Math.random() * 4),  minR: 18, maxR: 42, spreadX: 60, spreadY: 4,  spreadZ: 32, tex: FOG_WISP_TEX,   baseOp: 0.55 },
+      };
+      const cfg = cfgMap[type] || cfgMap.fair;
+
+      for (let p = 0; p < cfg.puffs; p++) {
+        const r = cfg.minR + Math.random() * (cfg.maxR - cfg.minR);
+        // Vary rotation per puff so they don't look copy-pasted
+        const rotOffset = (Math.random() - 0.5) * 0.9;
+        const mat = new THREE.SpriteMaterial({
+          map: cfg.tex,
+          transparent: true,
+          opacity: cfg.baseOp * (0.6 + Math.random() * 0.4),
+          depthWrite: false,
+          blending: THREE.NormalBlending,
+          fog: false,
+          rotation: rotOffset,
+        });
+        const sprite = new THREE.Sprite(mat);
+        // Non-uniform scale: wide and flat, not circular
+        const scaleX = r * (1.8 + Math.random() * 0.8);
+        const scaleY = r * (0.7 + Math.random() * 0.5);
+        sprite.scale.set(scaleX, scaleY, 1);
+        // Offset positions: spread widely on XZ, little on Y (flat cloud layer)
+        const ox = (Math.random() - 0.5) * cfg.spreadX;
+        const oy = (Math.random() - 0.5) * cfg.spreadY + (p < 3 ? r * 0.3 : 0);
+        const oz = (Math.random() - 0.5) * cfg.spreadZ;
+        sprite.position.set(ox, oy, oz);
+        group.add(sprite);
+      }
+
+      group.userData = {
+        type,
+        targetOpacity: 0,
+        currentOpacity: 0,
+        driftX: (Math.random() - 0.5) * 4,
+        driftZ: (Math.random() - 0.5) * 4,
+        phase: Math.random() * Math.PI * 2,
+        baseY: 0,
+        precipDelay: 0,
+      };
+      return group;
+    }
+
+    // ── Place clouds across the world ──
+    const CLOUD_COUNT = 22;
+    const weatherClouds = []; // storm/snow clouds that appear with weather
+    const fairClouds    = []; // always-present fluffy white clouds
+
+    function placeCloud(group, wx, wz, baseY) {
+      group.position.set(wx, baseY, wz);
+      group.userData.baseY = baseY;
+      scene.add(group);
+    }
+
+    // Fair-weather clouds: always visible, 60-80 units high
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2 + Math.random();
+      const dist  = 50 + Math.random() * 180;
+      const wx = Math.cos(angle) * dist;
+      const wz = Math.sin(angle) * dist;
+      const cloud = makeCloud3D('fair');
+      placeCloud(cloud, wx, wz, 55 + Math.random() * 25);
+      cloud.userData.targetOpacity = 0.9 + Math.random() * 0.1;
+      cloud.userData.currentOpacity = cloud.userData.targetOpacity; // start visible
+      // Set initial opacity on all puffs
+      cloud.children.forEach(s => { s.material.opacity = cloud.userData.currentOpacity * (0.7 + Math.random() * 0.3); });
+      fairClouds.push(cloud);
+    }
+
+    // Storm/snow clouds: appear when weather is Rain or Snow, float lower (30-50 high)
+    for (let i = 0; i < CLOUD_COUNT; i++) {
+      const angle = (i / CLOUD_COUNT) * Math.PI * 2 + Math.random() * 0.4;
+      const dist  = 30 + Math.random() * 150;
+      const wx = Math.cos(angle) * dist;
+      const wz = Math.sin(angle) * dist;
+      // Will be snow or rain cloud depending on weather
+      const cloud = makeCloud3D('storm');
+      placeCloud(cloud, wx, wz, 35 + Math.random() * 20);
+      cloud.userData.targetOpacity = 0;
+      cloud.userData.currentOpacity = 0;
+      cloud.children.forEach(s => { s.material.opacity = 0; });
+      weatherClouds.push(cloud);
+    }
+
+    // Ground fog wisps (separate from clouds, appear with fog slider)
+    const FOG_WISP_COUNT = 18;
+    const fogWisps = [];
+    for (let i = 0; i < FOG_WISP_COUNT; i++) {
+      const angle = (i / FOG_WISP_COUNT) * Math.PI * 2 + Math.random();
+      const dist  = 20 + Math.random() * 120;
+      const wx = Math.cos(angle) * dist;
+      const wz = Math.sin(angle) * dist;
+      const terrH = getHeight(wx, wz);
+      const wisp = makeCloud3D('fog');
+      placeCloud(wisp, wx, wz, terrH + 1.5 + Math.random() * 5);
+      wisp.userData.targetOpacity = 0;
+      wisp.userData.currentOpacity = 0;
+      wisp.children.forEach(s => { s.material.opacity = 0; });
+      fogWisps.push(wisp);
+    }
+
+    // ── Precipitation formation state machine ──
+    // 0=clear, 1=clouds_forming (precip=0), 2=full (precip active)
+    let weatherFormationState = 0;
+    let weatherFormationTimer = 0;
+    const CLOUD_FORM_TIME = 3.5; // seconds for clouds to form before precip starts
+
+    // ── Target opacities for smooth transitions ──
+    let rainTargetOpacity = 0;
+    // snowTargetOpacity already declared above with snowOpacity
+
+    function setWeatherState() {
+      const intensityScale = currentPrecipitation / 100;
+
+      if (currentWeatherType === 'Clear') {
+        // Immediately stop precip, clouds dissolve
+        rainTargetOpacity = 0;
+        snowTargetOpacity = 0;
+        weatherFormationState = 0;
+        weatherFormationTimer = 0;
+        weatherClouds.forEach(c => { c.userData.targetOpacity = 0; });
+        // Restore fair clouds
+        fairClouds.forEach(c => { c.userData.targetOpacity = 0.9; });
+
+      } else if (currentWeatherType === 'Rain') {
+        rainTargetOpacity = 0;   // will be enabled after clouds form
+        snowTargetOpacity = 0;
+        // Start cloud formation
+        if (weatherFormationState === 0 && intensityScale > 0) {
+          weatherFormationState = 1;
+          weatherFormationTimer = 0;
+        }
+        updateWindVector();
+        for (let i = 0; i < RAIN_COUNT; i++) {
+          rainVelocities[i * 3 + 0] = windVector.x * 0.12 + (Math.random() - 0.5) * 1.5;
+          rainVelocities[i * 3 + 1] = -(18 + intensityScale * 14 + Math.random() * 8);
+          rainVelocities[i * 3 + 2] = windVector.z * 0.12 + (Math.random() - 0.5) * 1.5;
+        }
+
+      } else if (currentWeatherType === 'Snow') {
+        snowTargetOpacity = 0;   // will be enabled after clouds form
+        rainTargetOpacity = 0;
+        if (weatherFormationState === 0 && intensityScale > 0) {
+          weatherFormationState = 1;
+          weatherFormationTimer = 0;
+        }
+        updateWindVector();
+        for (let i = 0; i < SNOW_COUNT; i++) {
+          snowVelocities[i * 3 + 0] = windVector.x * 0.1 + (Math.random() - 0.5) * 0.8;
+          snowVelocities[i * 3 + 1] = -(1.5 + intensityScale * 3.0 + Math.random() * 2.0);
+          snowVelocities[i * 3 + 2] = windVector.z * 0.1 + (Math.random() - 0.5) * 0.8;
+        }
+      }
     }
 
     // Call immediately to set initial weather
     setWeatherState();
 
+    // ── Per-frame weather update ──────────────────────────────────
     function updateWeather(dt) {
-      if (!dt || (!snowSystem.visible && !rainSystem.visible)) return;
+      if (!dt) return;
       updateWindVector();
-      
       const t = performance.now() / 1000;
+      const intensityScale = currentPrecipitation / 100;
 
-      // Update SNOW
-      if (snowSystem.visible && snowIntensityNode.value > 0) { 
-        snowSystem.position.copy(camera.position);
-        const pos = snowGeo.attributes.position.array;
-        const intensityScale = currentPrecipitation / 100;
-        
-        for (let i = 0; i < snowCount; i++) {
-            let vx = snowDrift[i * 3] + windVector.x;
-            let vy = snowDrift[i * 3 + 1] - (intensityScale * 1);
-            let vz = snowDrift[i * 3 + 2] + windVector.z;
+      // ── CLOUD FORMATION STATE MACHINE ──
+      const weatherStatusEl = document.getElementById('weather-status');
+      const showWeatherStatus = (msg) => {
+        if (weatherStatusEl) { weatherStatusEl.style.display = 'block'; weatherStatusEl.textContent = msg; }
+      };
+      const hideWeatherStatus = () => {
+        if (weatherStatusEl) weatherStatusEl.style.display = 'none';
+      };
+      if ((currentWeatherType === 'Rain' || currentWeatherType === 'Snow') && intensityScale > 0) {
+        if (weatherFormationState === 1) {
+          // Phase 1: clouds rolling in – no precipitation yet
+          weatherFormationTimer += dt;
+          const cloudProgress = Math.min(weatherFormationTimer / CLOUD_FORM_TIME, 1.0);
+          // Storm clouds fade in
+          weatherClouds.forEach(c => { c.userData.targetOpacity = cloudProgress * (0.75 + intensityScale * 0.2); });
+          // Fair clouds fade out to make way for storm clouds
+          fairClouds.forEach(c => { c.userData.targetOpacity = 1.0 - cloudProgress * 0.85; });
 
-            const swayX = Math.sin(t * 1.5 + i) * 1.2;
-            const swayZ = Math.cos(t * 1.5 + i) * 1.2;
+          const pct = Math.round(cloudProgress * 100);
+          if (currentWeatherType === 'Rain') showWeatherStatus(`⛅ עננים מתגבשים... ${pct}%`);
+          else showWeatherStatus(`🌨 עננים שלגיים מגיעים... ${pct}%`);
 
-            pos[i * 3] += (vx + swayX) * dt;
-            pos[i * 3 + 1] += vy * dt;
-            pos[i * 3 + 2] += (vz + swayZ) * dt;
-
-            if (pos[i * 3 + 1] < -20 || pos[i * 3 + 1] > 90 || Math.abs(pos[i * 3]) > 75 || Math.abs(pos[i * 3 + 2]) > 75) {
-              pos[i * 3 + 1] = 20 + Math.random() * 60; 
-              pos[i * 3] = (Math.random() - 0.5) * 150;
-              pos[i * 3 + 2] = (Math.random() - 0.5) * 150;
-            }
+          if (cloudProgress >= 1.0) {
+            weatherFormationState = 2;
+            // Now enable precipitation
+            if (currentWeatherType === 'Rain') rainTargetOpacity = 0.60 + intensityScale * 0.35;
+            if (currentWeatherType === 'Snow') snowTargetOpacity = 0.85;
           }
-          snowGeo.attributes.position.needsUpdate = true;
+        } else if (weatherFormationState === 2) {
+          // Phase 2: full storm – keep targets up-to-date with slider
+          weatherClouds.forEach(c => { c.userData.targetOpacity = 0.75 + intensityScale * 0.2; });
+          if (currentWeatherType === 'Rain') rainTargetOpacity = 0.60 + intensityScale * 0.35;
+          if (currentWeatherType === 'Snow') snowTargetOpacity = 0.85;
+          if (currentWeatherType === 'Rain') showWeatherStatus('🌧️ גשם');
+          else showWeatherStatus('❄️ שלג');
+        }
+      } else if (currentWeatherType === 'Clear' || intensityScale === 0) {
+        rainTargetOpacity = 0;
+        snowTargetOpacity = 0;
+        weatherFormationState = 0;
+        weatherFormationTimer = 0;
+        weatherClouds.forEach(c => { c.userData.targetOpacity = 0; });
+        fairClouds.forEach(c => { c.userData.targetOpacity = 0.9; });
+        hideWeatherStatus();
+      }
+
+      // ── UPDATE ALL CLOUD GROUPS (fair + weather + fog wisps) ──
+      const allClouds = [...fairClouds, ...weatherClouds, ...fogWisps];
+      for (const cloud of allClouds) {
+        const ud = cloud.userData;
+
+        // Smooth per-cloud opacity
+        ud.currentOpacity = THREE.MathUtils.lerp(ud.currentOpacity, ud.targetOpacity, dt * 0.8);
+
+        // Apply to all puff sprites with per-puff variation
+        cloud.children.forEach((s, pi) => {
+          const puffVar = 0.65 + (pi % 3) * 0.15;
+          s.material.opacity = THREE.MathUtils.clamp(ud.currentOpacity * puffVar, 0, 0.95);
+        });
+
+        // Drift with wind
+        const windDx = windVector.x * 0.006 * dt;
+        const windDz = windVector.z * 0.006 * dt;
+        cloud.position.x += (ud.driftX * 0.25 * dt) + windDx;
+        cloud.position.z += (ud.driftZ * 0.25 * dt) + windDz;
+
+        // Gentle Y bob
+        cloud.position.y = ud.baseY + Math.sin(t * 0.08 + ud.phase) * 1.2;
+
+        // Storm clouds already use dark texture; just modulate opacity by intensity
+        if (ud.type === 'storm') {
+          const extra = 0.85 + intensityScale * 0.15;
+          cloud.children.forEach(s => {
+            if (currentWeatherType === 'Snow') {
+              // Snow clouds: blueish-white, slightly lighter
+              s.material.color.setRGB(0.94, 0.97, 1.0);
+            } else {
+              s.material.color.setRGB(extra * 0.75, extra * 0.78, extra * 0.82);
+            }
+          });
         }
 
-      // Update RAIN streaks (Lines)
-      if (rainMat.opacity > 0) {
+        // Re-wrap clouds that drift too far from player
+        const camX = camera.position.x;
+        const camZ = camera.position.z;
+        if (Math.abs(cloud.position.x - camX) > 280 || Math.abs(cloud.position.z - camZ) > 280) {
+          const newAngle = Math.random() * Math.PI * 2;
+          const isFog = fogWisps.includes(cloud);
+          const newDist = isFog ? (20 + Math.random() * 100) : (40 + Math.random() * 180);
+          cloud.position.x = camX + Math.cos(newAngle) * newDist;
+          cloud.position.z = camZ + Math.sin(newAngle) * newDist;
+          if (isFog) {
+            const tH = getHeight(cloud.position.x, cloud.position.z);
+            cloud.position.y = tH + 1.5 + Math.random() * 4;
+            ud.baseY = cloud.position.y;
+          }
+        }
+      }
+
+      // Smooth opacity transitions for rain
+      const smoothSpeed = dt * 1.8;
+      rainMat.opacity = THREE.MathUtils.lerp(rainMat.opacity, rainTargetOpacity, smoothSpeed);
+
+      // ── RAIN update ──
+      if (rainMat.opacity > 0.01) {
         rainSystem.position.copy(camera.position);
         const pos = rainGeo.attributes.position.array;
-        const streakLengthMult = currentWeatherType === 'Wind' ? 0.3 : 0.08; // Leaves/debris are shorter than rain streaks
-        const intensityScale = currentPrecipitation / 100;
-        
-        for (let i = 0; i < rainCount; i++) {
-          // Apply initial setup if it was never done
-          if (pos[i * 6 + 1] < -300) {
-            const x = (Math.random() - 0.5) * 150;
-            const y = Math.random() * 80;
-            const z = (Math.random() - 0.5) * 150;
-            pos[i * 6] = x; pos[i * 6 + 1] = y; pos[i * 6 + 2] = z;
-            pos[i * 6 + 3] = x; pos[i * 6 + 4] = y - 1; pos[i * 6 + 5] = z;
+        for (let i = 0; i < RAIN_COUNT; i++) {
+          let px = pos[i * 6];
+          let py = pos[i * 6 + 1];
+          let pz = pos[i * 6 + 2];
+
+          const vx = rainVelocities[i * 3 + 0] + windVector.x * 0.08;
+          const vy = rainVelocities[i * 3 + 1];
+          const vz = rainVelocities[i * 3 + 2] + windVector.z * 0.08;
+
+          px += vx * dt;
+          py += vy * dt;
+          pz += vz * dt;
+
+          // Streak tail: top point is offset by the full velocity direction
+          // so the line VISUALLY tilts with wind angle — more wind = more tilt
+          const streakLen = -(Math.abs(vy) / 22.0) * 1.6;
+          const horizScale = Math.abs(streakLen) * (Math.hypot(vx, vz) / Math.abs(vy)) * 1.2;
+          const horizAngle = Math.atan2(vz, vx);
+
+          if (py < -28 || Math.abs(px) > 85 || Math.abs(pz) > 85) {
+            px = (Math.random() - 0.5) * 170;
+            py = 32 + Math.random() * 20;
+            pz = (Math.random() - 0.5) * 170;
+            rainVelocities[i * 3 + 0] = windVector.x * 0.12 + (Math.random() - 0.5) * 1.5;
+            rainVelocities[i * 3 + 1] = -(18 + intensityScale * 14 + Math.random() * 8);
+            rainVelocities[i * 3 + 2] = windVector.z * 0.12 + (Math.random() - 0.5) * 1.5;
           }
 
-          let vx = rainVelocities[i * 3] || 0;
-          let vy = rainVelocities[i * 3 + 1] || -15; 
-          let vz = rainVelocities[i * 3 + 2] || 0;
-
-          // Continuous update of velocities based on current wind
-          if (currentWeatherType === 'Rain') {
-            rainVelocities[i * 3] = (Math.random() - 0.5) + windVector.x * 1.5;
-            rainVelocities[i * 3 + 1] = -15 - Math.random() * 10 - (intensityScale * 5);
-            rainVelocities[i * 3 + 2] = (Math.random() - 0.5) + windVector.z * 1.5;
-          } else { // Wind
-            rainVelocities[i * 3] = windVector.x * 2 + (Math.random() - 0.5) * 5;
-            rainVelocities[i * 3 + 1] = -1 - Math.random() * 2;
-            rainVelocities[i * 3 + 2] = windVector.z * 2 + (Math.random() - 0.5) * 5;
-          }
-
-          // Update Start Position (Head of the drop)
-          pos[i * 6] += vx * dt;
-          pos[i * 6 + 1] += vy * dt;
-          pos[i * 6 + 2] += vz * dt;
-          
-          // Update End Position (Tail of the drop stretches backwards along velocity vector)
-          pos[i * 6 + 3] = pos[i * 6] - vx * streakLengthMult;
-          pos[i * 6 + 4] = pos[i * 6 + 1] - vy * streakLengthMult - 0.5; // Extra forced offset
-          pos[i * 6 + 5] = pos[i * 6 + 2] - vz * streakLengthMult;
-
-          if (pos[i * 6 + 1] < -20 || pos[i * 6 + 1] > 90 || Math.abs(pos[i * 6]) > 75 || Math.abs(pos[i * 6 + 2]) > 75) {
-            const x = (Math.random() - 0.5) * 150;
-            const y = 40 + Math.random() * 40;
-            const z = (Math.random() - 0.5) * 150;
-            pos[i * 6] = x; pos[i * 6 + 1] = y; pos[i * 6 + 2] = z;
-            pos[i * 6 + 3] = x; pos[i * 6 + 4] = y - 1; pos[i * 6 + 5] = z;
-          }
+          pos[i * 6 + 0] = px;
+          pos[i * 6 + 1] = py;
+          pos[i * 6 + 2] = pz;
+          // End of streak: displaced both down AND sideways with wind
+          pos[i * 6 + 3] = px + Math.cos(horizAngle) * horizScale;
+          pos[i * 6 + 4] = py + streakLen;
+          pos[i * 6 + 5] = pz + Math.sin(horizAngle) * horizScale;
         }
         rainGeo.attributes.position.needsUpdate = true;
+        // Set rain colour once, not every frame
+        if (rainMat.color.r > 0.63 || rainMat.color.r < 0.61) {
+          rainMat.color.setRGB(0.62, 0.78, 0.92);
+        }
       }
+
+      // ── SNOW update – InstancedMesh (single draw call) ──
+      snowOpacity = THREE.MathUtils.lerp(snowOpacity, snowTargetOpacity, dt * 2.5);
+      snowMat.opacity = snowOpacity;
+
+      if (snowOpacity > 0.005) {
+        // Camera basis vectors for billboard rotation
+        const camQuat = camera.quaternion;
+
+        for (let i = 0; i < SNOW_COUNT; i++) {
+          const phase = snowPhases[i];
+          const swayX = Math.sin(t * 0.6 + phase) * 0.35;
+          const swayZ = Math.cos(t * 0.5 + phase * 1.2) * 0.35;
+
+          snowPositions[i * 3]     += (snowVelocities[i * 3]     + swayX + windVector.x * 0.07) * dt;
+          snowPositions[i * 3 + 1] +=  snowVelocities[i * 3 + 1] * dt;
+          snowPositions[i * 3 + 2] += (snowVelocities[i * 3 + 2] + swayZ + windVector.z * 0.07) * dt;
+
+          // Respawn
+          if (snowPositions[i*3+1] < -28 || Math.abs(snowPositions[i*3]) > 70 || Math.abs(snowPositions[i*3+2]) > 70) {
+            snowPositions[i * 3]     = (Math.random() - 0.5) * 140;
+            snowPositions[i * 3 + 1] = 10 + Math.random() * 42;
+            snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 140;
+            snowVelocities[i * 3]     = windVector.x * 0.1 + (Math.random() - 0.5) * 0.8;
+            snowVelocities[i * 3 + 1] = -(1.2 + intensityScale * 2.5 + Math.random() * 1.8);
+            snowVelocities[i * 3 + 2] = windVector.z * 0.1 + (Math.random() - 0.5) * 0.8;
+          }
+
+          // World position = camera position + local offset
+          _snowPos.set(
+            camera.position.x + snowPositions[i * 3],
+            camera.position.y + snowPositions[i * 3 + 1],
+            camera.position.z + snowPositions[i * 3 + 2]
+          );
+          const s = snowSizes[i];
+          _snowScale.set(s, s, s);
+
+          // Tilt flake in wind direction: compute a quaternion that is
+          // camQuat rotated by wind tilt around the camera's right axis
+          const windStrength = Math.hypot(windVector.x, windVector.z);
+          if (windStrength > 0.01) {
+            // Max tilt ~35° at full wind
+            const tiltAngle = Math.min(windStrength / 15.0, 1.0) * 0.6;
+            // Wind direction in world XZ → tilt axis is perpendicular (rotate around Z-of-wind)
+            const windAngle = Math.atan2(windVector.z, windVector.x);
+            // Tilt euler: rotate around world Z-perpendicular to wind
+            _snowQuat.setFromEuler(new THREE.Euler(
+              Math.cos(windAngle) * tiltAngle,   // tilt X
+              0,
+              -Math.sin(windAngle) * tiltAngle   // tilt Z
+            )).multiply(camQuat);
+            _snowMatrix.compose(_snowPos, _snowQuat, _snowScale);
+          } else {
+            _snowMatrix.compose(_snowPos, camQuat, _snowScale);
+          }
+          snowMesh.setMatrixAt(i, _snowMatrix);
+        }
+        snowMesh.instanceMatrix.needsUpdate = true;
+      } else {
+        // Hide: move all flakes far away
+        _snowPos.set(0, -9999, 0);
+        _snowScale.set(0.001, 0.001, 0.001);
+        _snowMatrix.compose(_snowPos, _snowQuat, _snowScale);
+        for (let i = 0; i < SNOW_COUNT; i++) snowMesh.setMatrixAt(i, _snowMatrix);
+        snowMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      // ── FOG WISPS update ──
+      const fogIntensity = currentFog / 100;
+      for (const wisp of fogWisps) {
+        const breath = 0.8 + 0.2 * Math.sin(t * 0.25 + wisp.userData.phase);
+        const targetOp = fogIntensity > 0 ? fogIntensity * 0.65 * breath : 0;
+        wisp.userData.targetOpacity = targetOp;
+      }
+
+      // ── LIGHTNING ──
+      updateLightning(dt);
     }
 
     // ============================================================
-    // BIRDS
+    // LIGHTNING SYSTEM
+    // ============================================================
+    const lightningBolts = [];
+    let lightningTimer   = 0;
+    let nextLightningIn  = 4 + Math.random() * 6; // seconds until first bolt
+    const lightningFlash = new THREE.PointLight(0xaabbff, 0, 800);
+    lightningFlash.position.set(0, 80, 0);
+    scene.add(lightningFlash);
+
+    // Build one jagged bolt as a LineSegments in world space
+    function spawnLightningBolt() {
+      const camX = camera.position.x;
+      const camZ = camera.position.z;
+
+      // Random position in a ring around the player (not directly overhead)
+      const angle  = Math.random() * Math.PI * 2;
+      const dist   = 40 + Math.random() * 120;
+      const startX = camX + Math.cos(angle) * dist;
+      const startZ = camZ + Math.sin(angle) * dist;
+      const startY = 55 + Math.random() * 25;           // top of bolt (cloud height)
+      const endY   = getHeight(startX, startZ) + 0.5;  // hits terrain
+
+      // Build zigzag path from top to ground
+      const segments  = 10 + Math.floor(Math.random() * 8);
+      const positions = [];
+      const spread    = 4;
+
+      for (let i = 0; i <= segments; i++) {
+        const frac   = i / segments;
+        const jigX   = i === 0 || i === segments ? 0 : (Math.random() - 0.5) * spread;
+        const jigZ   = i === 0 || i === segments ? 0 : (Math.random() - 0.5) * spread;
+        positions.push(
+          startX + jigX,
+          startY + (endY - startY) * frac,
+          startZ + jigZ
+        );
+      }
+
+      // Optionally add one fork branch
+      const hasFork = Math.random() > 0.4;
+      if (hasFork) {
+        const forkAt = Math.floor(segments * (0.3 + Math.random() * 0.3));
+        const fx  = positions[forkAt * 3];
+        const fy  = positions[forkAt * 3 + 1];
+        const fz  = positions[forkAt * 3 + 2];
+        const fSegs = 4 + Math.floor(Math.random() * 4);
+        for (let i = 0; i <= fSegs; i++) {
+          const frac = i / fSegs;
+          positions.push(
+            fx + (Math.random() - 0.5) * spread * frac * 3,
+            fy - (fy - endY * 0.6) * frac,
+            fz + (Math.random() - 0.5) * spread * frac * 3
+          );
+        }
+        // Build index pairs for fork segment
+        const baseIdx = segments + 1;
+        const forkIndices = [];
+        for (let i = 0; i < fSegs; i++) {
+          forkIndices.push(baseIdx + i, baseIdx + i + 1);
+        }
+        // Store fork indices separately in userData
+        return { positions, segments, forkAt, forkIndices, forkSegs: fSegs };
+      }
+      return { positions, segments, forkAt: -1, forkIndices: [], forkSegs: 0 };
+    }
+
+    function createLightningMesh(boltData) {
+      const { positions, segments, forkAt, forkIndices, forkSegs } = boltData;
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+      // Build index pairs for main bolt
+      const indices = [];
+      for (let i = 0; i < segments; i++) indices.push(i, i + 1);
+      // Add fork indices if any
+      for (const idx of forkIndices) indices.push(idx);
+
+      geo.setIndex(indices);
+
+      const mat = new THREE.LineBasicMaterial({
+        color: 0xeeeeff,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        linewidth: 1,
+      });
+      const mesh = new THREE.LineSegments(geo, mat);
+      mesh.frustumCulled = false;
+      return mesh;
+    }
+
+    function updateLightning(dt) {
+      if (currentWeatherType !== 'Rain') {
+        // Clear any leftover bolts if weather changed
+        for (const b of lightningBolts) scene.remove(b.mesh);
+        lightningBolts.length = 0;
+        lightningFlash.intensity = 0;
+        return;
+      }
+      if (currentPrecipitation < 20) return; // only lightning in moderate+ rain
+
+      lightningTimer += dt;
+
+      // Spawn new bolt periodically
+      if (lightningTimer >= nextLightningIn) {
+        lightningTimer = 0;
+        // Frequency scales with rain intensity
+        nextLightningIn = 3 + Math.random() * 8 * (1.2 - currentPrecipitation / 100);
+
+        const boltData = spawnLightningBolt();
+        const mesh     = createLightningMesh(boltData);
+        scene.add(mesh);
+
+        // Flash light at bolt origin
+        const px = boltData.positions[0];
+        const pz = boltData.positions[2];
+        lightningFlash.position.set(px, boltData.positions[1], pz);
+        lightningFlash.intensity = 6 + Math.random() * 8;
+
+        // Brief sky flash: slightly brighten ambient for one frame
+        const origAmbient = ambient.intensity;
+        ambient.intensity = Math.min(origAmbient + 0.8, 2.5);
+        setTimeout(() => { ambient.intensity = origAmbient; }, 80);
+
+        lightningBolts.push({
+          mesh,
+          age: 0,
+          duration: 0.10 + Math.random() * 0.12, // bolt visible 100-220ms
+          flicker: Math.random() > 0.5,           // some bolts flicker once
+        });
+      }
+
+      // Animate / fade existing bolts
+      for (let i = lightningBolts.length - 1; i >= 0; i--) {
+        const b = lightningBolts[i];
+        b.age += dt;
+        const frac = b.age / b.duration;
+
+        if (frac >= 1.0) {
+          // Bolt expired
+          scene.remove(b.mesh);
+          b.mesh.geometry.dispose();
+          b.mesh.material.dispose();
+          lightningBolts.splice(i, 1);
+        } else {
+          // Fade out quickly: bright then gone
+          let op;
+          if (b.flicker && frac > 0.4 && frac < 0.6) {
+            op = 0.15; // mid-flicker dim
+          } else {
+            op = Math.pow(1.0 - frac, 1.8); // rapid fade
+          }
+          b.mesh.material.opacity = op;
+        }
+      }
+
+      // Decay flash light
+      lightningFlash.intensity = THREE.MathUtils.lerp(lightningFlash.intensity, 0, dt * 14);
+    }
     // ============================================================
     const birds = [];
     for (let i = 0; i < 25; i++) {
@@ -2073,16 +2671,19 @@
       underwaterActive = isUnderwater;
       if (underwaterActive) {
         scene.background = UNDERWATER_BG_COLOR.clone();
-        scene.fog.color.copy(UNDERWATER_FOG_COLOR);
-        scene.fog.near = UNDERWATER_FOG_NEAR;
-        scene.fog.far = UNDERWATER_FOG_FAR;
+        // Always use Fog (not FogExp2) underwater
+        scene.fog = new THREE.Fog(UNDERWATER_FOG_COLOR.clone(), UNDERWATER_FOG_NEAR, UNDERWATER_FOG_FAR);
         renderer.toneMappingExposure = TONE_EXPOSURE * 0.9;
         if (underwaterOverlay) underwaterOverlay.style.opacity = '1';
       } else {
         scene.background = SKY_BG_COLOR.clone();
-        scene.fog.color.copy(SKY_FOG_COLOR);
-        scene.fog.near = SKY_FOG_NEAR;
-        scene.fog.far = SKY_FOG_FAR;
+        // Restore the appropriate fog type
+        if (currentFog > 30) {
+          const density = THREE.MathUtils.lerp(0.001, 0.028, (currentFog / 100 - 0.3) / 0.7);
+          scene.fog = new THREE.FogExp2(SKY_FOG_COLOR.clone(), density);
+        } else {
+          scene.fog = new THREE.Fog(SKY_FOG_COLOR.clone(), SKY_FOG_NEAR, SKY_FOG_FAR);
+        }
         renderer.toneMappingExposure = TONE_EXPOSURE;
         if (underwaterOverlay) underwaterOverlay.style.opacity = '0';
       }
@@ -2178,12 +2779,11 @@
     // Weather Type Buttons
     document.querySelectorAll('.weather-type-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const target = e.target.closest('.weather-type-btn');
-        if (!target) return;
         document.querySelectorAll('.weather-type-btn').forEach(b => b.classList.remove('active'));
-        target.classList.add('active');
-        currentWeatherType = target.getAttribute('data-weather');
+        e.target.classList.add('active');
+        currentWeatherType = e.target.getAttribute('data-weather');
         setWeatherState();
+        updateLighting(); // update sky darkening
       });
     });
 
@@ -2193,7 +2793,8 @@
     precipSlider.addEventListener('input', (e) => {
       currentPrecipitation = parseInt(e.target.value);
       precipDisplay.textContent = `${currentPrecipitation}%`;
-      setWeatherState(); // Update weather visuals instantly
+      setWeatherState();
+      updateLighting(); // update sky darkening
     });
 
     const windSlider = document.getElementById('wind-slider');
@@ -2244,22 +2845,34 @@
       const elevation = Math.sin(timeAngle);
       const isDay = elevation > 0;
 
+      // Twilight zone: smooth transition around horizon (±15° = ±0.26 rad elevation)
+      const twilight = THREE.MathUtils.smoothstep(elevation, -0.15, 0.15); // 0=full night, 1=full day
+
       if (isDay) {
-        const sunStrength = Math.min(elevation * 3, 1.0);
-        sun.intensity = SUN_INTENSITY * sunStrength;
+        const sunStrength = THREE.MathUtils.smoothstep(elevation, 0, 0.25);
+        sun.intensity    = SUN_INTENSITY * sunStrength;
         moonLight.intensity = 0;
-        ambient.intensity = 0.5 * sunStrength + 0.1; // Baseline night ambient is 0.1
-        hemi.intensity = HEMI_INTENSITY * sunStrength;
+        ambient.intensity = 0.08 + 0.42 * twilight;   // 0.08 at sunrise edge → 0.50 at noon
+        hemi.intensity    = HEMI_INTENSITY * sunStrength;
+        skyFill.intensity = 0.28 * sunStrength;
       } else {
         sun.intensity = 0;
-        const moonElevation = Math.sin(moonAngle);
-        const moonStrength = Math.max(0, Math.min(moonElevation * 2, 1.0));
-        // Full moon = brightest. New moon = dimmest night.
-        const phaseBrightness = 1.0 - Math.abs(currentDayOfMonth - 15) / 15.0; // 0 to 1 peak at 15
 
-        moonLight.intensity = (0.5 + phaseBrightness * 0.8) * moonStrength;
-        ambient.intensity = 0.1 + phaseBrightness * 0.15;
-        hemi.intensity = 0.1;
+        const moonElevation = Math.sin(moonAngle);
+        const moonStrength  = Math.max(0, THREE.MathUtils.smoothstep(moonElevation, -0.05, 0.2));
+        // Full moon (day 15) brightest, new moon (day 1/30) near dark
+        const phaseBrightness = 1.0 - Math.abs(currentDayOfMonth - 15) / 15.0; // 0→1 peak day 15
+
+        // Moon gives a very dim blue-silver cast — only when above horizon
+        moonLight.intensity  = (0.18 + phaseBrightness * 0.22) * moonStrength;
+        moonLight.color.setHex(0xaac8ee); // cool blue moonlight
+
+        // Deep night: only stars + faint moon — almost pitch black
+        // ambient scales with moon phase AND twilight
+        const moonAmbient = 0.025 + phaseBrightness * 0.04; // 0.025 (new moon) → 0.065 (full moon)
+        ambient.intensity = THREE.MathUtils.lerp(moonAmbient, 0.08, twilight);
+        hemi.intensity    = THREE.MathUtils.lerp(0.015, 0.08, twilight);
+        skyFill.intensity = THREE.MathUtils.lerp(0.0, 0.08, twilight); // near zero at night
       }
 
       // Hide/Show meshes below horizon
@@ -2282,21 +2895,41 @@
         baseFogColor.lerp(new THREE.Color(0xffe0b2), 0.4);
       }
 
-      // Blend to night sky
-      const nightBgColor = new THREE.Color(0x0a0f1a);
-      const nightFogColor = new THREE.Color(0x101828);
+      // Blend to night sky - use the same smooth twilight curve
+      const nightBgColor  = new THREE.Color(0x03060f); // near-black deep night
+      const nightFogColor = new THREE.Color(0x060c18);
 
-      // Calculate blend factor (1 = day, 0 = night)
+      // blendFactor: 0 = full night, 1 = full day (same curve as twilight but for bg)
       let blendFactor = THREE.MathUtils.clamp((elevation + 0.1) * 2, 0, 1);
 
       scene.background.copy(nightBgColor).lerp(baseBgColor, blendFactor);
+
+      // Darken sky when rain/snow is active
+      if (currentWeatherType === 'Rain' && currentPrecipitation > 0) {
+        const rainDark = (currentPrecipitation / 100) * 0.55;
+        scene.background.lerp(new THREE.Color(0x3a4a5a), rainDark);
+      } else if (currentWeatherType === 'Snow' && currentPrecipitation > 0) {
+        const snowOvercast = (currentPrecipitation / 100) * 0.35;
+        scene.background.lerp(new THREE.Color(0xb8c8d8), snowOvercast);
+      }
+
       scene.fog.color.copy(nightFogColor).lerp(baseFogColor, blendFactor);
 
       // Adjust fog distance based on currentFog slider (0% to 100%)
-      // 0% fog = very far (1000), 100% fog = very near (40)
       const fogDensityFactor = currentFog / 100;
-      scene.fog.far = THREE.MathUtils.lerp(800, 60, fogDensityFactor);
-      scene.fog.near = THREE.MathUtils.lerp(10, 5, fogDensityFactor);
+      // Switch to exponential fog when heavy fog is active for more realistic layered look
+      if (fogDensityFactor > 0.3 && !(scene.fog instanceof THREE.FogExp2)) {
+        scene.fog = new THREE.FogExp2(scene.fog.color.clone(), 0.001);
+      } else if (fogDensityFactor <= 0.3 && scene.fog instanceof THREE.FogExp2) {
+        scene.fog = new THREE.Fog(scene.fog.color.clone(), SKY_FOG_NEAR, SKY_FOG_FAR);
+      }
+      if (scene.fog instanceof THREE.FogExp2) {
+        scene.fog.density = THREE.MathUtils.lerp(0.001, 0.028, (fogDensityFactor - 0.3) / 0.7);
+        scene.fog.color.copy(nightFogColor).lerp(baseFogColor, blendFactor);
+      } else {
+        scene.fog.far = THREE.MathUtils.lerp(800, 150, fogDensityFactor);
+        scene.fog.near = THREE.MathUtils.lerp(10, 5, fogDensityFactor);
+      }
     }
 
     function rebuildWorldForSeason() {
@@ -2490,8 +3123,8 @@
       // Update foam system (splash + waterline foam)
       updateFoamSystem(dt);
 
-      // Rain/Snow Splashes on Water (Disabled to prevent WebGPU hang)
-      // updateWeatherInteractions(dt);
+      // Rain/Snow Splashes on Water
+      updateWeatherInteractions(dt);
 
       // Procedural Vegetation Swaying (Trees/Bushes)
       const windIntensity = currentWind / 100;
@@ -2892,23 +3525,31 @@
     // Rain/Snow Splashes on Water
     function updateWeatherInteractions(dt) {
       if (currentWeatherType !== 'Rain' && currentWeatherType !== 'Snow') return;
-      if (weatherMat.opacity <= 0) return;
+      const activeOpacity = currentWeatherType === 'Rain' ? rainMat.opacity : snowOpacity;
+      if (activeOpacity <= 0.05) return;
 
-      const pos = weatherGeo.attributes.position.array;
       const camPos = camera.position;
+      const count = currentWeatherType === 'Rain' ? RAIN_COUNT : SNOW_COUNT;
+      const checkStep = currentWeatherType === 'Rain' ? 4 : 8;
 
-      for (let i = 0; i < weatherCount; i++) {
-        const px = pos[i * 3] + camPos.x;
-        const py = pos[i * 3 + 1] + camPos.y;
-        const pz = pos[i * 3 + 2] + camPos.z;
+      for (let i = 0; i < count; i += checkStep) {
+        let px, py, pz;
+        if (currentWeatherType === 'Rain') {
+          const pos = rainGeo.attributes.position.array;
+          px = pos[i * 6]     + camPos.x;
+          py = pos[i * 6 + 1] + camPos.y;
+          pz = pos[i * 6 + 2] + camPos.z;
+        } else {
+          // Snow uses snowPositions (camera-relative)
+          px = snowPositions[i * 3]     + camPos.x;
+          py = snowPositions[i * 3 + 1] + camPos.y;
+          pz = snowPositions[i * 3 + 2] + camPos.z;
+        }
 
-        // Roughly check if this particle hit a water surface
         const lake = getLakeAtWater(px, pz);
-        if (lake && Math.abs(py - lake.level) < 0.5) {
-          // Trigger a small splash effect
-          if (Math.random() > 0.95) { // Optimization: don't splash every drop every frame
-            const splashPos = new THREE.Vector3(px, lake.level, pz);
-            spawnSplash(splashPos);
+        if (lake && Math.abs(py - lake.level) < 0.8) {
+          if (Math.random() > 0.93) {
+            createSplash(px, pz, 0.3, lake);
           }
         }
       }
